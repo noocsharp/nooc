@@ -1,7 +1,11 @@
+#include <elf.h>
+#include <fcntl.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <elf.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 char code[] = {0xb8, 60, 0x00, 0x00, 0x00, 0xbf, 0x00, 0x00, 0x00, 0x00, 0xf, 0x5};
 
@@ -65,27 +69,36 @@ elf(char *text, size_t len, FILE *f)
 	fwrite(text, 1, len, f);
 }
 
-char inbuf[16];
+struct stat statbuf;
 
 int main(int argc, char *argv[])
 {
 	if (argc < 3)
 		return 1;
 
-	FILE *in = fopen(argv[1], "r");
-	if (!in) {
+	int in = open(argv[1], 0, O_RDONLY);
+	if (in < 0) {
 		fprintf(stderr, "couldn't open input\n");
 		return 1;
 	}
 
-	fgets(inbuf, 16, in);
-	fclose(in);
-	long val = strtol(inbuf, NULL, 10);
+	if (fstat(in, &statbuf) < 0) {
+		close(in);
+		fprintf(stderr, "failed to stat in file\n");
+		return 1;
+	}
+
+	char *addr = mmap(NULL, statbuf.st_size, PROT_READ, MAP_PRIVATE, in, 0);
+	close(in);
+
+	long val = strtol(addr, NULL, 10);
+	munmap(addr, statbuf.st_size);
 
 	code[6] = val;
 
-	FILE *out = fopen(argv[2], "w");
+	FILE *out = fopen(argv[2], "r");
 	if (!out) {
+		close(in);
 		fprintf(stderr, "couldn't open output\n");
 		return 1;
 	}
