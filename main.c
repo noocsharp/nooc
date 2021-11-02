@@ -97,7 +97,11 @@ lex(struct slice start)
 
 	struct token *cur = head;
 	while (start.len) {
-		if (strncmp(start.ptr, "exit", sizeof("exit") - 1) == 0) {
+		if (isblank(*start.ptr)) {
+			start.ptr += 1;
+			start.len -= 1;
+			continue;
+		} else if (strncmp(start.ptr, "exit", sizeof("exit") - 1) == 0) {
 			cur->type = TOK_EXIT;
 			start.ptr += 4;
 			start.len -= 4;
