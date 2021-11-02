@@ -71,9 +71,14 @@ elf(char *text, size_t len, FILE *f)
 }
 
 enum tokentype {
-	TOK_EXIT = 1,
+	TOK_SYSCALL = 1,
+	TOK_EXIT,
+
 	TOK_LPAREN,
 	TOK_RPAREN,
+
+	TOK_COMMA,
+
 	TOK_NUM,
 };
 
@@ -103,8 +108,16 @@ lex(struct slice start)
 			continue;
 		} else if (strncmp(start.ptr, "exit", sizeof("exit") - 1) == 0) {
 			cur->type = TOK_EXIT;
-			start.ptr += 4;
-			start.len -= 4;
+			start.ptr += sizeof("exit") - 1;
+			start.len -= sizeof("exit") - 1;
+		} else if (strncmp(start.ptr, "syscall", sizeof("syscall") - 1) == 0) {
+			cur->type = TOK_SYSCALL;
+			start.ptr += sizeof("syscall") - 1;
+			start.len -= sizeof("syscall") - 1;
+		} else if (*start.ptr == ',') {
+			cur->type = TOK_COMMA;
+			start.ptr += 1;
+			start.len -= 1;
 		} else if (*start.ptr == '(') {
 			cur->type = TOK_LPAREN;
 			start.ptr += 1;
@@ -168,11 +181,15 @@ struct fcall
 parse(struct token *tok)
 {
 	struct fcall fcall;
-	expect(tok, TOK_EXIT);
-
-	fcall.func = FUNC_EXIT;
+	expect(tok, TOK_SYSCALL);
 	tok = tok->next;
 	expect(tok, TOK_LPAREN);
+	tok = tok->next;
+
+	expect(tok, TOK_EXIT);
+	fcall.func = FUNC_EXIT;
+	tok = tok->next;
+	expect(tok, TOK_COMMA);
 	tok = tok->next;
 	expect(tok, TOK_NUM);
 

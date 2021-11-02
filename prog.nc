@@ -1,1 +1,1 @@
-	exit( 23 )
+syscall(exit, 12)
