@@ -8,6 +8,8 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include "array.h"
+
 char code[] = {0xb8, 0, 0x00, 0x00, 0x00, 0xbf, 0x00, 0x00, 0x00, 0x00, 0xf, 0x5};
 
 int
@@ -156,9 +158,15 @@ enum func {
 	FUNC_EXIT
 };
 
+struct fparams {
+	size_t cap;
+	size_t len;
+	int *data;
+};
+
 struct fcall {
 	enum func func;
-	int val;
+	struct fparams params;
 };
 
 void
@@ -180,25 +188,60 @@ expect(struct token *tok, enum tokentype type)
 struct fcall
 parse(struct token *tok)
 {
-	struct fcall fcall;
+	struct fcall fcall = { 0 };
 	expect(tok, TOK_SYSCALL);
 	tok = tok->next;
 	expect(tok, TOK_LPAREN);
 	tok = tok->next;
 
-	expect(tok, TOK_EXIT);
-	fcall.func = FUNC_EXIT;
-	tok = tok->next;
-	expect(tok, TOK_COMMA);
-	tok = tok->next;
-	expect(tok, TOK_NUM);
+	int val;
+	while (1) {
+		expect(tok, TOK_NUM);
+		val = strtol(tok->slice.ptr, NULL, 10);
+		array_add((&fcall.params), val);
+		tok = tok->next;
+
+		if (tok->type == TOK_RPAREN)
+			break;
+		expect(tok, TOK_COMMA);
+		tok = tok->next;
+	}
 
 	// FIXME: error check
-	fcall.val = strtol(tok->slice.ptr, NULL, 10);
-	tok = tok->next;
 	expect(tok, TOK_RPAREN);
 	tok = tok->next;
 	return fcall;
+}
+
+size_t
+gensyscall(char *buf, struct fparams *params)
+{
+	if (params->len > 7)
+		error("syscall can take at most 7 parameters");
+
+	if (buf) {
+		char *ptr = buf;
+		char mov[] = {0x48, 0xc7};
+		char padding[] = {0, 0, 0};
+
+		// encoding for argument registers in ABI order
+		char regs[] = {0, 7, 6, 2, 10, 8, 9};
+		for (int i = 0; i < params->len; i++) {
+			memcpy(ptr, mov, 2);
+			ptr += 2;
+			char op1 = 0xc0 | regs[i];
+			*(ptr++) = op1;
+			*(ptr++) = params->data[i];
+			memset(ptr, 0, 3);
+			ptr += 3;
+		}
+
+		char syscall[] = {0x0f, 0x05};
+		memcpy(ptr, syscall, 2);
+	}
+
+	// for now, we assume each mov is 7 bytes encoded, and 2 bytes for syscall
+	return 7*params->len + 2;
 }
 
 struct stat statbuf;
@@ -232,7 +275,7 @@ main(int argc, char *argv[])
 	switch (fcall.func) {
 	case FUNC_EXIT:
 		code[1] = 60;
-		code[6] = fcall.val;
+		code[6] = fcall.params.data[0];
 	}
 
 	FILE *out = fopen(argv[2], "w");
@@ -242,8 +285,15 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	elf(code, sizeof(code), out);
-	fprintf(stderr, "size: %d\n", sizeof(code));
+	size_t len = gensyscall(NULL, &(fcall.params));
+	char *fcode = malloc(len);
+	if (!fcode)
+		error("gensyscall malloc failed");
+
+	gensyscall(fcode, &(fcall.params));
+
+	elf(fcode, len, out);
+	fprintf(stderr, "size: %d\n", len);
 
 	fclose(out);
 }

@@ -1,1 +1,1 @@
-syscall(exit, 12)
+syscall(60, 12)
