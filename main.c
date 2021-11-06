@@ -13,11 +13,11 @@
 char code[] = {0xb8, 0, 0x00, 0x00, 0x00, 0xbf, 0x00, 0x00, 0x00, 0x00, 0xf, 0x5};
 
 int
-elf(char *text, size_t len, FILE *f)
+elf(char *text, size_t len, char*data, size_t dlen, FILE *f)
 {
 	Elf64_Ehdr ehdr = { 0 };
 	Elf64_Phdr phdr_text = { 0 };
-	Elf64_Shdr shdr_text = { 0 };
+	Elf64_Phdr phdr_data = { 0 };
 
 	ehdr.e_ident[0] = ELFMAG0;
 	ehdr.e_ident[1] = ELFMAG1;
@@ -35,14 +35,11 @@ elf(char *text, size_t len, FILE *f)
 	ehdr.e_entry = 0x1000;
 	ehdr.e_phoff = sizeof(ehdr);
 	ehdr.e_phentsize = sizeof(phdr_text);
-	ehdr.e_phnum = 1;
+	ehdr.e_phnum = 2;
 
-	ehdr.e_shoff = sizeof(ehdr) + sizeof(phdr_text);
-	ehdr.e_shentsize = sizeof(shdr_text);
-	ehdr.e_shnum = 1;
 	ehdr.e_ehsize = sizeof(ehdr);
 
-	size_t pretextlen = sizeof(ehdr) + sizeof(phdr_text) + sizeof(shdr_text);
+	size_t pretextlen = sizeof(ehdr) + sizeof(phdr_text) + sizeof(phdr_data);
 
 	phdr_text.p_type = PT_LOAD;
 	phdr_text.p_offset = 0x1000;
@@ -53,27 +50,33 @@ elf(char *text, size_t len, FILE *f)
 	phdr_text.p_flags = PF_R | PF_X;
 	phdr_text.p_align = 0x1000;
 
-	shdr_text.sh_name = 10;
-	shdr_text.sh_type = SHT_PROGBITS;
-	shdr_text.sh_flags = SHF_ALLOC | SHF_EXECINSTR;
-	shdr_text.sh_addr = 0x1000;
-	shdr_text.sh_offset = 0x1000;
-	shdr_text.sh_size = len;
-	shdr_text.sh_addralign = 1;
+	phdr_data.p_type = PT_LOAD;
+	phdr_data.p_offset = 0x2000;
+	phdr_data.p_vaddr = 0x2000;
+	phdr_data.p_paddr = 0x2000;
+	phdr_data.p_filesz = dlen;
+	phdr_data.p_memsz = dlen;
+	phdr_data.p_flags = PF_R;
+	phdr_data.p_align = 0x1000;
 
 	fwrite(&ehdr, 1, sizeof(Elf64_Ehdr), f);
 	fwrite(&phdr_text, sizeof(phdr_text), 1, f);
-	fwrite(&shdr_text, sizeof(shdr_text), 1, f);
+	fwrite(&phdr_data, sizeof(phdr_data), 1, f);
 	char empty = 0;
-	fprintf(stderr, "pretextlen: %u\n", pretextlen);
+
 	for (int i = 0; i < 0x1000 - pretextlen; i++) {
 		fwrite(&empty, 1, 1, f);
 	}
 	fwrite(text, 1, len, f);
+	for (int i = 0; i < 0x1000 - len; i++) {
+		fwrite(&empty, 1, 1, f);
+	}
+	fwrite(data, 1, dlen, f);
 }
 
 enum tokentype {
 	TOK_SYSCALL = 1,
+	TOK_PRINT,
 	TOK_EXIT,
 
 	TOK_LPAREN,
@@ -82,6 +85,7 @@ enum tokentype {
 	TOK_COMMA,
 
 	TOK_NUM,
+	TOK_STRING,
 };
 
 struct slice {
@@ -139,6 +143,20 @@ lex(struct slice start)
 				start.len--;
 				cur->slice.len++;
 			}
+		} else if (*start.ptr == '"') {
+			start.ptr++;
+			start.len--;
+			cur->slice.ptr = start.ptr;
+			cur->slice.len = 0;
+			cur->type = TOK_STRING;
+			while (*start.ptr != '"') {
+				start.ptr++;
+				start.len--;
+				cur->slice.len++;
+			}
+
+			start.ptr++;
+			start.len--;
 		}
 
 		cur->next = calloc(1, sizeof(struct token));
@@ -185,6 +203,22 @@ expect(struct token *tok, enum tokentype type)
 		error("mismatch");
 }
 
+struct data {
+	size_t cap;
+	size_t len;
+	char *data;
+} data_seg;
+
+#define DATA_OFFSET 0x2000
+
+int
+data_push(char *ptr, size_t len)
+{
+	size_t dlen = data_seg.len;
+	array_push((&data_seg), ptr, len);
+	return 0x2000 + data_seg.len - len;
+}
+
 struct fcall
 parse(struct token *tok)
 {
@@ -196,10 +230,18 @@ parse(struct token *tok)
 
 	int val;
 	while (1) {
-		expect(tok, TOK_NUM);
-		val = strtol(tok->slice.ptr, NULL, 10);
-		array_add((&fcall.params), val);
-		tok = tok->next;
+		switch (tok->type) {
+		case TOK_NUM:
+			val = strtol(tok->slice.ptr, NULL, 10);
+			array_add((&fcall.params), val);
+			tok = tok->next;
+			break;
+		case TOK_STRING:
+			val = data_push(tok->slice.ptr, tok->slice.len);
+			array_add((&fcall.params), val);
+			tok = tok->next;
+			break;
+		}
 
 		if (tok->type == TOK_RPAREN)
 			break;
@@ -231,9 +273,11 @@ gensyscall(char *buf, struct fparams *params)
 			ptr += 2;
 			char op1 = 0xc0 | regs[i];
 			*(ptr++) = op1;
-			*(ptr++) = params->data[i];
-			memset(ptr, 0, 3);
-			ptr += 3;
+			int val = params->data[i];
+			*(ptr++) = val & 0xFF;
+			*(ptr++) = (val >> 8) & 0xFF;
+			*(ptr++) = (val >> 16) & 0xFF;
+			*(ptr++) = (val >> 24) & 0xFF;
 		}
 
 		char syscall[] = {0x0f, 0x05};
@@ -269,14 +313,8 @@ main(int argc, char *argv[])
 
 	struct token *head = lex((struct slice){addr, statbuf.st_size});
 	struct fcall fcall = parse(head);
-	
-	munmap(addr, statbuf.st_size);
 
-	switch (fcall.func) {
-	case FUNC_EXIT:
-		code[1] = 60;
-		code[6] = fcall.params.data[0];
-	}
+	munmap(addr, statbuf.st_size);
 
 	FILE *out = fopen(argv[2], "w");
 	if (!out) {
@@ -292,8 +330,7 @@ main(int argc, char *argv[])
 
 	gensyscall(fcode, &(fcall.params));
 
-	elf(fcode, len, out);
-	fprintf(stderr, "size: %d\n", len);
+	elf(fcode, len, data_seg.data, data_seg.len, out);
 
 	fclose(out);
 }

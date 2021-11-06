@@ -1,1 +1,1 @@
-syscall(60, 12)
+syscall(1, 0, "hello", 5)
