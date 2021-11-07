@@ -75,9 +75,9 @@ elf(char *text, size_t len, char*data, size_t dlen, FILE *f)
 }
 
 enum tokentype {
+	TOK_NONE = 0,
 	TOK_SYSCALL = 1,
 	TOK_PRINT,
-	TOK_EXIT,
 
 	TOK_LPAREN,
 	TOK_RPAREN,
@@ -112,10 +112,6 @@ lex(struct slice start)
 			start.ptr += 1;
 			start.len -= 1;
 			continue;
-		} else if (strncmp(start.ptr, "exit", sizeof("exit") - 1) == 0) {
-			cur->type = TOK_EXIT;
-			start.ptr += sizeof("exit") - 1;
-			start.len -= sizeof("exit") - 1;
 		} else if (strncmp(start.ptr, "syscall", sizeof("syscall") - 1) == 0) {
 			cur->type = TOK_SYSCALL;
 			start.ptr += sizeof("syscall") - 1;
@@ -157,6 +153,10 @@ lex(struct slice start)
 
 			start.ptr++;
 			start.len--;
+		} else if (*start.ptr == '\n') {
+			start.ptr++;
+			start.len--;
+			continue;
 		}
 
 		cur->next = calloc(1, sizeof(struct token));
@@ -173,7 +173,7 @@ lex(struct slice start)
 
 enum func {
 	FUNC_NONE,
-	FUNC_EXIT
+	FUNC_SYSCALL
 };
 
 struct fparams {
@@ -219,40 +219,53 @@ data_push(char *ptr, size_t len)
 	return 0x2000 + data_seg.len - len;
 }
 
-struct fcall
+struct calls {
+	size_t cap;
+	size_t len;
+	struct fcall *data;
+};
+
+struct calls
 parse(struct token *tok)
 {
-	struct fcall fcall = { 0 };
-	expect(tok, TOK_SYSCALL);
-	tok = tok->next;
-	expect(tok, TOK_LPAREN);
-	tok = tok->next;
+	struct calls calls = { 0 };
+	struct fcall fcall;
 
-	int val;
-	while (1) {
-		switch (tok->type) {
-		case TOK_NUM:
-			val = strtol(tok->slice.ptr, NULL, 10);
-			array_add((&fcall.params), val);
-			tok = tok->next;
-			break;
-		case TOK_STRING:
-			val = data_push(tok->slice.ptr, tok->slice.len);
-			array_add((&fcall.params), val);
-			tok = tok->next;
-			break;
-		}
-
-		if (tok->type == TOK_RPAREN)
-			break;
-		expect(tok, TOK_COMMA);
+	while (tok->type != TOK_NONE) {
+		fcall = (struct fcall){ 0 };
+		expect(tok, TOK_SYSCALL);
 		tok = tok->next;
+		expect(tok, TOK_LPAREN);
+		tok = tok->next;
+
+		int val;
+		while (1) {
+			switch (tok->type) {
+			case TOK_NUM:
+				val = strtol(tok->slice.ptr, NULL, 10);
+				array_add((&fcall.params), val);
+				tok = tok->next;
+				break;
+			case TOK_STRING:
+				// FIXME: error check
+				val = data_push(tok->slice.ptr, tok->slice.len);
+				array_add((&fcall.params), val);
+				tok = tok->next;
+				break;
+			}
+
+			if (tok->type == TOK_RPAREN)
+				break;
+			expect(tok, TOK_COMMA);
+			tok = tok->next;
+		}
+		expect(tok, TOK_RPAREN);
+		tok = tok->next;
+
+		array_add((&calls), fcall);
 	}
 
-	// FIXME: error check
-	expect(tok, TOK_RPAREN);
-	tok = tok->next;
-	return fcall;
+	return calls;
 }
 
 size_t
@@ -312,7 +325,7 @@ main(int argc, char *argv[])
 	close(in);
 
 	struct token *head = lex((struct slice){addr, statbuf.st_size});
-	struct fcall fcall = parse(head);
+	struct calls calls = parse(head);
 
 	munmap(addr, statbuf.st_size);
 
@@ -323,14 +336,21 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	size_t len = gensyscall(NULL, &(fcall.params));
-	char *fcode = malloc(len);
-	if (!fcode)
-		error("gensyscall malloc failed");
+	struct data text = { 0 };
 
-	gensyscall(fcode, &(fcall.params));
+	for (int i = 0; i < calls.len; i++) {
+		size_t len = gensyscall(NULL, &(calls.data[i].params));
+		char *fcode = malloc(len);
+		if (!fcode)
+			error("gensyscall malloc failed");
 
-	elf(fcode, len, data_seg.data, data_seg.len, out);
+		gensyscall(fcode, &(calls.data[i].params));
+		array_push((&text), fcode, len);
+
+		free(fcode);
+	}
+
+	elf(text.data, text.len, data_seg.data, data_seg.len, out);
 
 	fclose(out);
 }
