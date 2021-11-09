@@ -2,6 +2,7 @@
 #include <elf.h>
 #include <fcntl.h>
 #include <string.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -268,37 +269,74 @@ parse(struct token *tok)
 	return calls;
 }
 
+enum Register {
+	RAX,
+	RCX,
+	RDX,
+	RBX,
+	RSP,
+	RBP,
+	RSI,
+	RDI,
+	R8,
+	R9,
+	R10,
+	R11,
+	R12,
+	R13,
+	R14,
+	R15,
+};
+
+enum mod {
+	MOD_INDIRECT,
+	MOD_DISP8,
+	MOD_DISP32,
+	MOD_DIRECT
+};
+
+size_t
+mov_r_imm(char *buf, enum Register reg, uint64_t imm)
+{
+	uint8_t mov[] = {0x48, 0xc7};
+	uint8_t op1 = (MOD_DIRECT << 6) | reg;
+	if (buf) {
+		memcpy(buf, mov, 2);
+		buf += 2;
+		*(buf++) = op1;
+		*(buf++) = imm & 0xFF;
+		*(buf++) = (imm >> 8) & 0xFF;
+		*(buf++) = (imm >> 16) & 0xFF;
+		*(buf++) = (imm >> 24) & 0xFF;
+	}
+
+	return 7;
+}
+
+char abi_arg[] = {RAX, RDI, RSI, RDX, R10, R8, R9};
+
 size_t
 gensyscall(char *buf, struct fparams *params)
 {
+	size_t len = 0;
 	if (params->len > 7)
 		error("syscall can take at most 7 parameters");
 
-	if (buf) {
-		char *ptr = buf;
-		char mov[] = {0x48, 0xc7};
-		char padding[] = {0, 0, 0};
+	char *ptr = buf;
 
-		// encoding for argument registers in ABI order
-		char regs[] = {0, 7, 6, 2, 10, 8, 9};
-		for (int i = 0; i < params->len; i++) {
-			memcpy(ptr, mov, 2);
-			ptr += 2;
-			char op1 = 0xc0 | regs[i];
-			*(ptr++) = op1;
-			int val = params->data[i];
-			*(ptr++) = val & 0xFF;
-			*(ptr++) = (val >> 8) & 0xFF;
-			*(ptr++) = (val >> 16) & 0xFF;
-			*(ptr++) = (val >> 24) & 0xFF;
-		}
-
-		char syscall[] = {0x0f, 0x05};
-		memcpy(ptr, syscall, 2);
+	// encoding for argument registers in ABI order
+	for (int i = 0; i < params->len; i++) {
+		len += mov_r_imm(ptr ? ptr + len : ptr, abi_arg[i], params->data[i]);
 	}
 
+	if (buf) {
+		char syscall[] = {0x0f, 0x05};
+		memcpy(ptr + len, syscall, 2);
+	}
+	len += 2;
+
 	// for now, we assume each mov is 7 bytes encoded, and 2 bytes for syscall
-	return 7*params->len + 2;
+	return len;
 }
 
 struct stat statbuf;
