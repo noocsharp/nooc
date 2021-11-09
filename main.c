@@ -83,6 +83,8 @@ enum tokentype {
 	TOK_LPAREN,
 	TOK_RPAREN,
 
+	TOK_PLUS,
+
 	TOK_COMMA,
 
 	TOK_NUM,
@@ -99,6 +101,13 @@ struct token {
 	struct slice slice;
 	struct token *next;
 };
+
+void
+error(char *error)
+{
+	fprintf(stderr, "%s\n", error);
+	exit(1);
+}
 
 struct token *
 lex(struct slice start)
@@ -158,6 +167,13 @@ lex(struct slice start)
 			start.ptr++;
 			start.len--;
 			continue;
+		} else if (*start.ptr == '+') {
+			cur->type = TOK_PLUS;
+			start.ptr++;
+			start.len--;
+			continue;
+		} else {
+			error("invalid token");
 		}
 
 		cur->next = calloc(1, sizeof(struct token));
@@ -180,20 +196,13 @@ enum func {
 struct fparams {
 	size_t cap;
 	size_t len;
-	int *data;
+	struct expr *data;
 };
 
 struct fcall {
 	enum func func;
 	struct fparams params;
 };
-
-void
-error(char *error)
-{
-	fprintf(stderr, "%s\n", error);
-	exit(1);
-}
 
 void
 expect(struct token *tok, enum tokentype type)
@@ -226,11 +235,62 @@ struct calls {
 	struct fcall *data;
 };
 
+enum primitive {
+	I32,
+	STR,
+};
+
+struct value {
+	enum primitive type;
+	uint64_t val;
+};
+
+struct expr {
+	enum {
+		EXPR_LIT,
+		EXPR_BINARY
+	} kind;
+	struct value val;
+	struct expr *left;
+	struct expr *right;
+};
+
+struct expr
+parseexpr(struct token **tok)
+{
+	struct expr expr = { 0 };
+	while (1) {
+		switch ((*tok)->type) {
+		case TOK_NUM:
+			expr.kind = EXPR_LIT;
+			expr.val.type = I32;
+			expr.val.val = strtol((*tok)->slice.ptr, NULL, 10);
+			*tok = (*tok)->next;
+			break;
+		case TOK_STRING:
+			// FIXME: error check
+			expr.kind = EXPR_LIT;
+			expr.val.type = STR;
+			expr.val.val = data_push((*tok)->slice.ptr, (*tok)->slice.len);
+			*tok = (*tok)->next;
+			break;
+		default:
+			error("invalid token for expression");
+		}
+
+		if ((*tok)->type == TOK_COMMA || (*tok)->type == TOK_RPAREN)
+			break;
+	}
+
+	return expr;
+}
+
 struct calls
 parse(struct token *tok)
 {
 	struct calls calls = { 0 };
 	struct fcall fcall;
+	struct expr expr;
 
 	while (tok->type != TOK_NONE) {
 		fcall = (struct fcall){ 0 };
@@ -241,20 +301,8 @@ parse(struct token *tok)
 
 		int val;
 		while (1) {
-			switch (tok->type) {
-			case TOK_NUM:
-				val = strtol(tok->slice.ptr, NULL, 10);
-				array_add((&fcall.params), val);
-				tok = tok->next;
-				break;
-			case TOK_STRING:
-				// FIXME: error check
-				val = data_push(tok->slice.ptr, tok->slice.len);
-				array_add((&fcall.params), val);
-				tok = tok->next;
-				break;
-			}
-
+			expr = parseexpr(&tok);
+			array_add((&fcall.params), expr);
 			if (tok->type == TOK_RPAREN)
 				break;
 			expect(tok, TOK_COMMA);
@@ -326,7 +374,7 @@ gensyscall(char *buf, struct fparams *params)
 
 	// encoding for argument registers in ABI order
 	for (int i = 0; i < params->len; i++) {
-		len += mov_r_imm(ptr ? ptr + len : ptr, abi_arg[i], params->data[i]);
+		len += mov_r_imm(ptr ? ptr + len : ptr, abi_arg[i], params->data[i].val.val);
 	}
 
 	if (buf) {
