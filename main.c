@@ -421,6 +421,24 @@ enum mod {
 };
 
 size_t
+add_r_imm(char *buf, enum Register reg, uint64_t imm)
+{
+	uint8_t mov[] = {0x48, 0x81};
+	uint8_t op1 = (MOD_DIRECT << 6) | reg;
+	if (buf) {
+		memcpy(buf, mov, 2);
+		buf += 2;
+		*(buf++) = op1;
+		*(buf++) = imm & 0xFF;
+		*(buf++) = (imm >> 8) & 0xFF;
+		*(buf++) = (imm >> 16) & 0xFF;
+		*(buf++) = (imm >> 24) & 0xFF;
+	}
+
+	return 7;
+}
+
+size_t
 mov_r_imm(char *buf, enum Register reg, uint64_t imm)
 {
 	uint8_t mov[] = {0x48, 0xc7};
@@ -447,11 +465,29 @@ genexpr(char *buf, size_t idx, int reg)
 	size_t len = 0;
 	char *ptr = buf;
 	struct expr *expr = &exprs.data[idx];
-	if (expr->kind == EXPR_LIT && expr->d.v.type == P_INT) {
-		len = mov_r_imm(ptr ? ptr + len : ptr, reg, expr->d.v.v.val);
-	} else if (expr->kind == EXPR_LIT && expr->d.v.type == P_STR) {
-		int addr = data_push(expr->d.v.v.s.ptr, expr->d.v.v.s.len);
-		len = mov_r_imm(ptr ? ptr + len : ptr, reg, addr);
+	if (expr->kind == EXPR_LIT) {
+		switch (expr->d.v.type) {
+		case P_INT:
+			len = mov_r_imm(ptr ? ptr + len : ptr, reg, expr->d.v.v.val);
+			break;
+		case P_STR:
+			int addr = data_push(expr->d.v.v.s.ptr, expr->d.v.v.s.len);
+			len = mov_r_imm(ptr ? ptr + len : ptr, reg, addr);
+			break;
+		default:
+			error("genexpr: unknown value type!");
+		}
+	} else if (expr->kind == EXPR_BINARY) {
+		switch (expr->d.op) {
+		case OP_PLUS:
+			struct expr *left = &exprs.data[expr->left];
+			struct expr *right = &exprs.data[expr->right];
+			len = mov_r_imm(ptr ? ptr + len : ptr, reg, left->d.v.v.val);
+			len += add_r_imm(ptr ? ptr + len : ptr, reg, right->d.v.v.val);
+			break;
+		default:
+			error("genexpr: unknown binary op!");
+		}
 	} else {
 		error("genexpr: could not generate code for expression");
 	}
