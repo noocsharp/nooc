@@ -12,7 +12,7 @@
 #include "array.h"
 
 int
-elf(char *text, size_t len, char*data, size_t dlen, FILE *f)
+elf(char *text, size_t len, char* data, size_t dlen, FILE *f)
 {
 	Elf64_Ehdr ehdr = { 0 };
 	Elf64_Phdr phdr_text = { 0 };
@@ -76,7 +76,6 @@ elf(char *text, size_t len, char*data, size_t dlen, FILE *f)
 enum tokentype {
 	TOK_NONE = 0,
 	TOK_SYSCALL = 1,
-	TOK_PRINT,
 
 	TOK_LPAREN,
 	TOK_RPAREN,
@@ -169,7 +168,6 @@ lex(struct slice start)
 			cur->type = TOK_PLUS;
 			start.ptr++;
 			start.len--;
-			continue;
 		} else {
 			error("invalid token");
 		}
@@ -194,7 +192,7 @@ enum func {
 struct fparams {
 	size_t cap;
 	size_t len;
-	struct expr *data;
+	size_t *data;
 };
 
 struct fcall {
@@ -234,53 +232,134 @@ struct calls {
 };
 
 enum primitive {
-	I32,
-	STR,
+	P_INT,
+	P_STR,
+};
+
+enum binop {
+	OP_PLUS,
 };
 
 struct value {
 	enum primitive type;
-	uint64_t val;
+	union {
+		uint64_t val;
+		struct slice s;
+	} v;
 };
+
+enum exprkind {
+	EXPR_LIT,
+	EXPR_BINARY
+};
+
+char *exprkind_str(enum exprkind kind)
+{
+	switch (kind) {
+	case EXPR_LIT:
+		return "EXPR_LIT";
+	case EXPR_BINARY:
+		return "EXPR_BINARY";
+	default:
+		error("invalid exprkind");
+	}
+}
 
 struct expr {
-	enum {
-		EXPR_LIT,
-		EXPR_BINARY
-	} kind;
-	struct value val;
-	struct expr *left;
-	struct expr *right;
+	enum exprkind kind;
+	union {
+		struct value v;
+		enum binop op;
+	} d;
+	size_t left;
+	size_t right;
 };
 
-struct expr
+struct exprs {
+	size_t cap;
+	size_t len;
+	struct expr *data;
+} exprs;
+
+void
+dumpval(struct value v)
+{
+	switch (v.type) {
+	case P_INT:
+		fprintf(stderr, "%ld", v.v.val);
+		break;
+	case P_STR:
+		fprintf(stderr, "\"%.*s\"", v.v.s.len, v.v.s.ptr);
+		break;
+	}
+}
+
+void
+dumpbinop(enum binop op)
+{
+	switch (op) {
+	case OP_PLUS:
+		fprintf(stderr, "OP_PLUS");
+		break;
+	default:
+		error("invalid binop");
+	}
+}
+
+void
+dumpexpr(int indent, struct expr *expr)
+{
+	for (int i = 0; i < indent; i++)
+		fputc(' ', stderr);
+	fprintf(stderr, "%s: ", exprkind_str(expr->kind));
+	switch (expr->kind) {
+	case EXPR_LIT:
+		dumpval(expr->d.v);
+		fprintf(stderr, "\n");
+		break;
+	case EXPR_BINARY:
+		dumpbinop(expr->d.op);
+		fprintf(stderr, "\n");
+		dumpexpr(indent + 8, &exprs.data[expr->left]);
+		dumpexpr(indent + 8, &exprs.data[expr->right]);
+		break;
+	default:
+		error("dumpexpr: bad expression");
+	}
+}
+
+size_t
 parseexpr(struct token **tok)
 {
 	struct expr expr = { 0 };
-	while (1) {
-		switch ((*tok)->type) {
-		case TOK_NUM:
-			expr.kind = EXPR_LIT;
-			expr.val.type = I32;
-			expr.val.val = strtol((*tok)->slice.ptr, NULL, 10);
-			*tok = (*tok)->next;
-			break;
-		case TOK_STRING:
-			// FIXME: error check
-			expr.kind = EXPR_LIT;
-			expr.val.type = STR;
-			expr.val.val = data_push((*tok)->slice.ptr, (*tok)->slice.len);
-			*tok = (*tok)->next;
-			break;
-		default:
-			error("invalid token for expression");
-		}
-
-		if ((*tok)->type == TOK_COMMA || (*tok)->type == TOK_RPAREN)
-			break;
+	switch ((*tok)->type) {
+	case TOK_NUM:
+		expr.kind = EXPR_LIT;
+		expr.d.v.type = P_INT;
+		// FIXME: error check
+		expr.d.v.v.val = strtol((*tok)->slice.ptr, NULL, 10);
+		*tok = (*tok)->next;
+		break;
+	case TOK_PLUS:
+		expr.kind = EXPR_BINARY;
+		expr.d.op = OP_PLUS;
+		*tok = (*tok)->next;
+		expr.left = parseexpr(tok);
+		expr.right = parseexpr(tok);
+		break;
+	case TOK_STRING:
+		expr.kind = EXPR_LIT;
+		expr.d.v.type = P_STR;
+		expr.d.v.v.s = (*tok)->slice;
+		*tok = (*tok)->next;
+		break;
+	default:
+		error("invalid token for expression");
 	}
 
-	return expr;
+	array_add((&exprs), expr);
+
+	return exprs.len - 1;
 }
 
 struct calls
@@ -288,7 +367,7 @@ parse(struct token *tok)
 {
 	struct calls calls = { 0 };
 	struct fcall fcall;
-	struct expr expr;
+	size_t expr;
 
 	while (tok->type != TOK_NONE) {
 		fcall = (struct fcall){ 0 };
@@ -362,6 +441,24 @@ mov_r_imm(char *buf, enum Register reg, uint64_t imm)
 char abi_arg[] = {RAX, RDI, RSI, RDX, R10, R8, R9};
 
 size_t
+genexpr(char *buf, size_t idx, int reg)
+{
+	// FIXME: this doesn't work for binary expressions
+	size_t len = 0;
+	char *ptr = buf;
+	struct expr *expr = &exprs.data[idx];
+	if (expr->kind == EXPR_LIT && expr->d.v.type == P_INT) {
+		len = mov_r_imm(ptr ? ptr + len : ptr, reg, expr->d.v.v.val);
+	} else if (expr->kind == EXPR_LIT && expr->d.v.type == P_STR) {
+		int addr = data_push(expr->d.v.v.s.ptr, expr->d.v.v.s.len);
+		len = mov_r_imm(ptr ? ptr + len : ptr, reg, addr);
+	} else {
+		error("genexpr: could not generate code for expression");
+	}
+	return len;
+}
+
+size_t
 gensyscall(char *buf, struct fparams *params)
 {
 	size_t len = 0;
@@ -372,7 +469,7 @@ gensyscall(char *buf, struct fparams *params)
 
 	// encoding for argument registers in ABI order
 	for (int i = 0; i < params->len; i++) {
-		len += mov_r_imm(ptr ? ptr + len : ptr, abi_arg[i], params->data[i].val.val);
+		len += genexpr(ptr ? ptr + len : ptr, params->data[i], abi_arg[i]);
 	}
 
 	if (buf) {
@@ -411,7 +508,6 @@ main(int argc, char *argv[])
 	struct token *head = lex((struct slice){addr, statbuf.st_size});
 	struct calls calls = parse(head);
 
-	munmap(addr, statbuf.st_size);
 
 	FILE *out = fopen(argv[2], "w");
 	if (!out) {
@@ -433,6 +529,8 @@ main(int argc, char *argv[])
 
 		free(fcode);
 	}
+	munmap(addr, statbuf.st_size);
+
 
 	elf(text.data, text.len, data_seg.data, data_seg.len, out);
 
