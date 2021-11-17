@@ -76,6 +76,7 @@ elf(char *text, size_t len, char* data, size_t dlen, FILE *f)
 enum tokentype {
 	TOK_NONE = 0,
 	TOK_SYSCALL = 1,
+	TOK_NAME,
 
 	TOK_LPAREN,
 	TOK_RPAREN,
@@ -83,6 +84,7 @@ enum tokentype {
 	TOK_PLUS,
 
 	TOK_COMMA,
+	TOK_EQUAL,
 
 	TOK_NUM,
 	TOK_STRING,
@@ -150,7 +152,6 @@ lex(struct slice start)
 			start.ptr++;
 			start.len--;
 			cur->slice.ptr = start.ptr;
-			cur->slice.len = 0;
 			cur->type = TOK_STRING;
 			while (*start.ptr != '"') {
 				start.ptr++;
@@ -168,6 +169,20 @@ lex(struct slice start)
 			cur->type = TOK_PLUS;
 			start.ptr++;
 			start.len--;
+		} else if (*start.ptr == '=') {
+			cur->type = TOK_EQUAL;
+			start.ptr++;
+			start.len--;
+		} else if (isalpha(*start.ptr)) {
+			cur->type = TOK_NAME;
+			start.ptr++;
+			start.len--;
+			cur->slice.ptr = start.ptr;
+			while (isalnum(*start.ptr)) {
+				start.ptr++;
+				start.len--;
+				cur->slice.len++;
+			}
 		} else {
 			error("invalid token");
 		}
