@@ -75,7 +75,6 @@ elf(char *text, size_t len, char* data, size_t dlen, FILE *f)
 
 enum tokentype {
 	TOK_NONE = 0,
-	TOK_SYSCALL = 1,
 	TOK_NAME,
 
 	TOK_LPAREN,
@@ -121,10 +120,6 @@ lex(struct slice start)
 			start.ptr += 1;
 			start.len -= 1;
 			continue;
-		} else if (strncmp(start.ptr, "syscall", sizeof("syscall") - 1) == 0) {
-			cur->type = TOK_SYSCALL;
-			start.ptr += sizeof("syscall") - 1;
-			start.len -= sizeof("syscall") - 1;
 		} else if (*start.ptr == ',') {
 			cur->type = TOK_COMMA;
 			start.ptr += 1;
@@ -175,9 +170,10 @@ lex(struct slice start)
 			start.len--;
 		} else if (isalpha(*start.ptr)) {
 			cur->type = TOK_NAME;
+			cur->slice.ptr = start.ptr;
+			cur->slice.len = 1;
 			start.ptr++;
 			start.len--;
-			cur->slice.ptr = start.ptr;
 			while (isalnum(*start.ptr)) {
 				start.ptr++;
 				start.len--;
@@ -199,11 +195,6 @@ lex(struct slice start)
 	return head;
 }
 
-enum func {
-	FUNC_NONE,
-	FUNC_SYSCALL
-};
-
 struct fparams {
 	size_t cap;
 	size_t len;
@@ -211,8 +202,14 @@ struct fparams {
 };
 
 struct fcall {
-	enum func func;
+	struct slice s;
 	struct fparams params;
+};
+
+struct decl {
+	struct slice s;
+	size_t val; // struct exprs
+	size_t addr;
 };
 
 void
@@ -232,19 +229,58 @@ struct data {
 
 #define DATA_OFFSET 0x2000
 
-int
+uint64_t
 data_push(char *ptr, size_t len)
 {
-	size_t dlen = data_seg.len;
 	array_push((&data_seg), ptr, len);
 	return 0x2000 + data_seg.len - len;
 }
 
-struct calls {
+uint64_t
+data_pushint(uint64_t i)
+{
+	array_push((&data_seg), (&i), 8);
+	return 0x2000 + data_seg.len - 8;
+}
+
+struct item {
+	enum {
+		ITEM_DECL,
+		ITEM_CALL
+	} kind;
+	union {
+		struct decl decl;
+		struct fcall call;
+	} d;
+};
+
+struct items {
 	size_t cap;
 	size_t len;
-	struct fcall *data;
+	struct item *data;
 };
+
+struct items *curitems;
+
+struct decls {
+	size_t cap;
+	size_t len;
+	uint64_t *data;
+} decls;
+
+struct decl *
+finddecl(struct items *items, struct slice s)
+{
+	for (int i = 0; i < decls.len; i++) {
+		struct decl *decl = &(items->data[decls.data[i]].d.decl);
+		size_t len = s.len < decl->s.len ? s.len : decl->s.len;
+		if (memcmp(s.ptr, decl->s.ptr, len) == 0) {
+			return decl;
+		}
+	}
+
+	return NULL;
+}
 
 enum primitive {
 	P_INT,
@@ -265,6 +301,7 @@ struct value {
 
 enum exprkind {
 	EXPR_LIT,
+	EXPR_IDENT,
 	EXPR_BINARY
 };
 
@@ -285,6 +322,7 @@ struct expr {
 	union {
 		struct value v;
 		enum binop op;
+		struct slice s;
 	} d;
 	size_t left;
 	size_t right;
@@ -348,6 +386,11 @@ parseexpr(struct token **tok)
 {
 	struct expr expr = { 0 };
 	switch ((*tok)->type) {
+	case TOK_NAME:
+		expr.kind = EXPR_IDENT;
+		expr.d.s = (*tok)->slice;
+		*tok = (*tok)->next;
+		break;
 	case TOK_NUM:
 		expr.kind = EXPR_LIT;
 		expr.d.v.type = P_INT;
@@ -377,36 +420,51 @@ parseexpr(struct token **tok)
 	return exprs.len - 1;
 }
 
-struct calls
+struct items
 parse(struct token *tok)
 {
-	struct calls calls = { 0 };
-	struct fcall fcall;
+	struct items items = { 0 };
+	struct item item;
+	struct token *name;
 	size_t expr;
 
 	while (tok->type != TOK_NONE) {
-		fcall = (struct fcall){ 0 };
-		expect(tok, TOK_SYSCALL);
+		item = (struct item){ 0 };
+		expect(tok, TOK_NAME);
+		name = tok;
 		tok = tok->next;
-		expect(tok, TOK_LPAREN);
-		tok = tok->next;
-
-		int val;
-		while (1) {
-			expr = parseexpr(&tok);
-			array_add((&fcall.params), expr);
-			if (tok->type == TOK_RPAREN)
-				break;
-			expect(tok, TOK_COMMA);
+		if (tok->type == TOK_LPAREN) {
+			item.kind = ITEM_CALL;
 			tok = tok->next;
-		}
-		expect(tok, TOK_RPAREN);
-		tok = tok->next;
 
-		array_add((&calls), fcall);
+			while (1) {
+				expr = parseexpr(&tok);
+				array_add((&item.d.call.params), expr);
+				if (tok->type == TOK_RPAREN)
+					break;
+				expect(tok, TOK_COMMA);
+				tok = tok->next;
+			}
+			expect(tok, TOK_RPAREN);
+			tok = tok->next;
+
+			item.d.call.s = name->slice;
+			array_add((&items), item);
+		} else if (tok->type = TOK_EQUAL) {
+			item.kind = ITEM_DECL;
+			tok = tok->next;
+			item.d.decl.val = parseexpr(&tok);
+			item.d.decl.s = name->slice;
+
+			array_add((&items), item);
+			uint64_t index = items.len - 1;
+			array_add((&decls), index);
+		} else {
+			error("unknown toplevel item");
+		}
 	}
 
-	return calls;
+	return items;
 }
 
 enum Register {
@@ -471,6 +529,26 @@ mov_r_imm(char *buf, enum Register reg, uint64_t imm)
 	return 7;
 }
 
+size_t
+mov_r64_m64(char *buf, enum Register reg, uint64_t addr)
+{
+	uint8_t mov[] = {0x48, 0x8b};
+	uint8_t op1 = (MOD_INDIRECT << 6) | (reg << 3) | 4;
+	uint8_t sib = 0x25;
+	if (buf) {
+		memcpy(buf, mov, 2);
+		buf += 2;
+		*(buf++) = op1;
+		*(buf++) = sib;
+		*(buf++) = addr & 0xFF;
+		*(buf++) = (addr >> 8) & 0xFF;
+		*(buf++) = (addr >> 16) & 0xFF;
+		*(buf++) = (addr >> 24) & 0xFF;
+	}
+
+	return 8;
+}
+
 char abi_arg[] = {RAX, RDI, RSI, RDX, R10, R8, R9};
 
 size_t
@@ -503,6 +581,12 @@ genexpr(char *buf, size_t idx, int reg)
 		default:
 			error("genexpr: unknown binary op!");
 		}
+	} else if (expr->kind == EXPR_IDENT) {
+		struct decl *decl = finddecl(curitems, expr->d.s);
+		if (decl == NULL) {
+			error("unknown name!");
+		}
+		len += mov_r64_m64(ptr ? ptr + len : ptr, reg, decl->addr);
 	} else {
 		error("genexpr: could not generate code for expression");
 	}
@@ -557,8 +641,8 @@ main(int argc, char *argv[])
 	close(in);
 
 	struct token *head = lex((struct slice){addr, statbuf.st_size});
-	struct calls calls = parse(head);
-
+	struct items items = parse(head);
+	curitems = &items;
 
 	FILE *out = fopen(argv[2], "w");
 	if (!out) {
@@ -569,16 +653,30 @@ main(int argc, char *argv[])
 
 	struct data text = { 0 };
 
-	for (int i = 0; i < calls.len; i++) {
-		size_t len = gensyscall(NULL, &(calls.data[i].params));
-		char *fcode = malloc(len);
-		if (!fcode)
-			error("gensyscall malloc failed");
+	for (int i = 0; i < items.len; i++) {
+		struct item *item = &items.data[i];
+		if (item->kind == ITEM_CALL) {
+			if (memcmp(item->d.call.s.ptr, "syscall", 7) == 0) {
+				size_t len = gensyscall(NULL, &(item->d.call.params));
+				char *fcode = malloc(len);
+				if (!fcode)
+					error("gensyscall malloc failed");
 
-		gensyscall(fcode, &(calls.data[i].params));
-		array_push((&text), fcode, len);
+				gensyscall(fcode, &(item->d.call.params));
+				array_push((&text), fcode, len);
 
-		free(fcode);
+				free(fcode);
+			}
+		} else if (item->kind == ITEM_DECL) {
+			struct expr *expr = &exprs.data[item->d.decl.val];
+			if (expr->kind == EXPR_LIT && expr->d.v.type == P_INT) {
+				item->d.decl.addr = data_pushint(expr->d.v.v.val);
+			} else {
+			error("cannot allocate memory for expression");
+			}
+		} else {
+			error("cannot generate code for type");
+		}
 	}
 	munmap(addr, statbuf.st_size);
 
