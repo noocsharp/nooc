@@ -11,6 +11,8 @@
 
 #include "array.h"
 
+#define DATA_OFFSET 0x2000
+
 int
 elf(char *text, size_t len, char* data, size_t dlen, FILE *f)
 {
@@ -50,9 +52,9 @@ elf(char *text, size_t len, char* data, size_t dlen, FILE *f)
 	phdr_text.p_align = 0x1000;
 
 	phdr_data.p_type = PT_LOAD;
-	phdr_data.p_offset = 0x2000;
-	phdr_data.p_vaddr = 0x2000;
-	phdr_data.p_paddr = 0x2000;
+	phdr_data.p_offset = DATA_OFFSET;
+	phdr_data.p_vaddr = DATA_OFFSET;
+	phdr_data.p_paddr = DATA_OFFSET;
 	phdr_data.p_filesz = dlen;
 	phdr_data.p_memsz = dlen;
 	phdr_data.p_flags = PF_R;
@@ -227,20 +229,18 @@ struct data {
 	char *data;
 } data_seg;
 
-#define DATA_OFFSET 0x2000
-
 uint64_t
 data_push(char *ptr, size_t len)
 {
 	array_push((&data_seg), ptr, len);
-	return 0x2000 + data_seg.len - len;
+	return DATA_OFFSET + data_seg.len - len;
 }
 
 uint64_t
 data_pushint(uint64_t i)
 {
 	array_push((&data_seg), (&i), 8);
-	return 0x2000 + data_seg.len - 8;
+	return DATA_OFFSET + data_seg.len - 8;
 }
 
 struct item {
@@ -341,9 +341,10 @@ dumpval(struct value v)
 	case P_INT:
 		fprintf(stderr, "%ld", v.v.val);
 		break;
-	case P_STR:
+	case P_STR: {
 		fprintf(stderr, "\"%.*s\"", v.v.s.len, v.v.s.ptr);
 		break;
+	}
 	}
 }
 
@@ -563,21 +564,23 @@ genexpr(char *buf, size_t idx, int reg)
 		case P_INT:
 			len = mov_r_imm(ptr ? ptr + len : ptr, reg, expr->d.v.v.val);
 			break;
-		case P_STR:
+		case P_STR: {
 			int addr = data_push(expr->d.v.v.s.ptr, expr->d.v.v.s.len);
 			len = mov_r_imm(ptr ? ptr + len : ptr, reg, addr);
 			break;
+		}
 		default:
 			error("genexpr: unknown value type!");
 		}
 	} else if (expr->kind == EXPR_BINARY) {
 		switch (expr->d.op) {
-		case OP_PLUS:
+		case OP_PLUS: {
 			struct expr *left = &exprs.data[expr->left];
 			struct expr *right = &exprs.data[expr->right];
 			len = mov_r_imm(ptr ? ptr + len : ptr, reg, left->d.v.v.val);
 			len += add_r_imm(ptr ? ptr + len : ptr, reg, right->d.v.v.val);
 			break;
+		}
 		default:
 			error("genexpr: unknown binary op!");
 		}
