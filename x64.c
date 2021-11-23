@@ -1,9 +1,38 @@
+#include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+
 #include "x64.h"
+#include "util.h"
 
 char abi_arg[] = {RAX, RDI, RSI, RDX, R10, R8, R9};
+unsigned short used_reg;
+
+void
+clearreg()
+{
+	used_reg = 0;
+}
+
+enum reg
+getreg()
+{
+	for (int i = 0; i < 16; i++) {
+		if (!(used_reg & (1 << i))) {
+			used_reg |= (1 << i);
+			return i;
+		}
+	}
+
+	error("out of registers!");
+}
+
+void
+freereg(enum reg reg)
+{
+	used_reg &= ~(1 << reg);
+}
 
 size_t
 add_r_imm(char *buf, enum reg reg, uint64_t imm)
@@ -59,4 +88,18 @@ mov_r64_m64(char *buf, enum reg reg, uint64_t addr)
 	}
 
 	return 8;
+}
+
+size_t
+add_r64_r64(char *buf, enum reg reg1, enum reg reg2)
+{
+	uint8_t mov[] = {0x48, 0x03};
+	uint8_t op = (MOD_DIRECT << 6) | (reg1 << 3) | reg2;
+	if (buf) {
+		memcpy(buf, mov, 2);
+		buf += 2;
+		*(buf++) = op;
+	}
+
+	return 3;
 }

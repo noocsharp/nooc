@@ -25,7 +25,13 @@ enum mod {
 };
 
 extern char abi_arg[];
+extern unsigned short used_reg;
+
+void clearreg();
+enum reg getreg();
+void freereg(enum reg reg);
 
 size_t add_r_imm(char *buf, enum reg reg, uint64_t imm);
 size_t mov_r_imm(char *buf, enum reg reg, uint64_t imm);
 size_t mov_r64_m64(char *buf, enum reg reg, uint64_t addr);
+size_t add_r64_r64(char *buf, enum reg reg1, enum reg reg2);

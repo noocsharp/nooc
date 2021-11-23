@@ -303,7 +303,6 @@ parse(struct token *tok)
 size_t
 genexpr(char *buf, size_t idx, enum reg reg)
 {
-	// FIXME: this doesn't work for binary expressions
 	size_t len = 0;
 	char *ptr = buf;
 	struct expr *expr = &exprs.data[idx];
@@ -323,10 +322,12 @@ genexpr(char *buf, size_t idx, enum reg reg)
 	} else if (expr->kind == EXPR_BINARY) {
 		switch (expr->d.op) {
 		case OP_PLUS: {
-			struct expr *left = &exprs.data[expr->left];
-			struct expr *right = &exprs.data[expr->right];
-			len = mov_r_imm(ptr ? ptr + len : ptr, reg, left->d.v.v.val);
-			len += add_r_imm(ptr ? ptr + len : ptr, reg, right->d.v.v.val);
+			len += genexpr(ptr ? ptr + len : ptr, expr->left, reg);
+			enum reg rreg = getreg();
+			len += genexpr(ptr ? ptr + len : ptr, expr->right, rreg);
+
+			len += add_r64_r64(ptr ? ptr + len : ptr, reg, rreg);
+			freereg(rreg);
 			break;
 		}
 		default:
@@ -355,8 +356,11 @@ gensyscall(char *buf, struct fparams *params)
 
 	// encoding for argument registers in ABI order
 	for (int i = 0; i < params->len; i++) {
+		used_reg |= (1 << abi_arg[i]);
 		len += genexpr(ptr ? ptr + len : ptr, params->data[i], abi_arg[i]);
 	}
+
+	clearreg();
 
 	if (buf) {
 		char syscall[] = {0x0f, 0x05};
