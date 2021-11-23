@@ -154,6 +154,8 @@ char *exprkind_str(enum exprkind kind)
 		return "EXPR_LIT";
 	case EXPR_BINARY:
 		return "EXPR_BINARY";
+	case EXPR_IDENT:
+		return "EXPR_IDENT";
 	default:
 		error("invalid exprkind");
 	}
@@ -194,6 +196,9 @@ dumpexpr(int indent, struct expr *expr)
 		fputc(' ', stderr);
 	fprintf(stderr, "%s: ", exprkind_str(expr->kind));
 	switch (expr->kind) {
+	case EXPR_IDENT:
+		fprintf(stderr, "%.*s\n", expr->d.s.len, expr->d.s.ptr);
+		break;
 	case EXPR_LIT:
 		dumpval(expr->d.v);
 		fprintf(stderr, "\n");
