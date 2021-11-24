@@ -20,7 +20,7 @@ _array_add(void **data, size_t size, size_t count, size_t *len, size_t *cap, voi
 			return -1;
 	}
 
-	memcpy(*data + size*(*len), new, size*count);
+	memcpy((char *)*data + size*(*len), new, size*count);
 	*len += count;
 
 	return *len;
