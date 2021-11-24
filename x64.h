@@ -35,3 +35,4 @@ size_t add_r_imm(char *buf, enum reg reg, uint64_t imm);
 size_t mov_r_imm(char *buf, enum reg reg, uint64_t imm);
 size_t mov_r64_m64(char *buf, enum reg reg, uint64_t addr);
 size_t add_r64_r64(char *buf, enum reg reg1, enum reg reg2);
+size_t sub_r64_r64(char *buf, enum reg reg1, enum reg reg2);

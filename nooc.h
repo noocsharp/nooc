@@ -8,6 +8,7 @@ enum tokentype {
 	TOK_RPAREN,
 
 	TOK_PLUS,
+	TOK_MINUS,
 
 	TOK_COMMA,
 	TOK_EQUAL,
@@ -80,6 +81,7 @@ enum primitive {
 
 enum binop {
 	OP_PLUS,
+	OP_MINUS,
 };
 
 struct value {

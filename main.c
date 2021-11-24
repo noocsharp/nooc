@@ -75,6 +75,10 @@ lex(struct slice start)
 			cur->type = TOK_PLUS;
 			start.ptr++;
 			start.len--;
+		} else if (*start.ptr == '-') {
+			cur->type = TOK_MINUS;
+			start.ptr++;
+			start.len--;
 		} else if (*start.ptr == '=') {
 			cur->type = TOK_EQUAL;
 			start.ptr++;
@@ -184,6 +188,9 @@ dumpbinop(enum binop op)
 	case OP_PLUS:
 		fprintf(stderr, "OP_PLUS");
 		break;
+	case OP_MINUS:
+		fprintf(stderr, "OP_MINUS");
+		break;
 	default:
 		error("invalid binop");
 	}
@@ -234,6 +241,13 @@ parseexpr(struct token **tok)
 	case TOK_PLUS:
 		expr.kind = EXPR_BINARY;
 		expr.d.op = OP_PLUS;
+		*tok = (*tok)->next;
+		expr.left = parseexpr(tok);
+		expr.right = parseexpr(tok);
+		break;
+	case TOK_MINUS:
+		expr.kind = EXPR_BINARY;
+		expr.d.op = OP_MINUS;
 		*tok = (*tok)->next;
 		expr.left = parseexpr(tok);
 		expr.right = parseexpr(tok);
@@ -327,6 +341,15 @@ genexpr(char *buf, size_t idx, enum reg reg)
 			len += genexpr(ptr ? ptr + len : ptr, expr->right, rreg);
 
 			len += add_r64_r64(ptr ? ptr + len : ptr, reg, rreg);
+			freereg(rreg);
+			break;
+		}
+		case OP_MINUS: {
+			len += genexpr(ptr ? ptr + len : ptr, expr->left, reg);
+			enum reg rreg = getreg();
+			len += genexpr(ptr ? ptr + len : ptr, expr->right, rreg);
+
+			len += sub_r64_r64(ptr ? ptr + len : ptr, reg, rreg);
 			freereg(rreg);
 			break;
 		}
