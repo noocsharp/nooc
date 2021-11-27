@@ -141,7 +141,7 @@ struct decl *
 finddecl(struct items *items, struct slice s)
 {
 	for (int i = 0; i < decls.len; i++) {
-		struct decl *decl = &(items->data[decls.data[i]].d.decl);
+		struct decl *decl = &(decls.data[i]);
 		size_t len = s.len < decl->s.len ? s.len : decl->s.len;
 		if (memcmp(s.ptr, decl->s.ptr, len) == 0) {
 			return decl;
@@ -227,8 +227,26 @@ parseexpr(struct token **tok)
 	struct expr expr = { 0 };
 	switch ((*tok)->type) {
 	case TOK_NAME:
-		expr.kind = EXPR_IDENT;
-		expr.d.s = (*tok)->slice;
+		// a function call
+		if ((*tok)->next && (*tok)->next->type == TOK_LPAREN) {
+			size_t pidx;
+			*tok = (*tok)->next->next;
+			expr.kind = EXPR_FCALL;
+
+			while (1) {
+				pidx = parseexpr(tok);
+				array_add((&expr.d.call.params), pidx);
+				if ((*tok)->type == TOK_RPAREN)
+					break;
+				expect(*tok, TOK_COMMA);
+				*tok = (*tok)->next;
+			}
+			expect(*tok, TOK_RPAREN);
+		// an ident
+		} else {
+			expr.kind = EXPR_IDENT;
+			expr.d.s = (*tok)->slice;
+		}
 		*tok = (*tok)->next;
 		break;
 	case TOK_NUM:
@@ -279,35 +297,21 @@ parse(struct token *tok)
 		item = (struct item){ 0 };
 		expect(tok, TOK_NAME);
 		name = tok;
-		tok = tok->next;
-		if (tok->type == TOK_LPAREN) {
-			item.kind = ITEM_CALL;
-			tok = tok->next;
-
-			while (1) {
-				expr = parseexpr(&tok);
-				array_add((&item.d.call.params), expr);
-				if (tok->type == TOK_RPAREN)
-					break;
-				expect(tok, TOK_COMMA);
-				tok = tok->next;
-			}
-			expect(tok, TOK_RPAREN);
-			tok = tok->next;
-
-			item.d.call.s = name->slice;
-			array_add((&items), item);
-		} else if (tok->type = TOK_EQUAL) {
+		if (tok->next && tok->next->type == TOK_EQUAL) {
+			struct decl decl;
 			item.kind = ITEM_DECL;
-			tok = tok->next;
-			item.d.decl.val = parseexpr(&tok);
-			item.d.decl.s = name->slice;
+			tok = tok->next->next;
 
+			decl.val = parseexpr(&tok);
+			decl.s = name->slice;
+			array_add((&decls), decl);
+
+			item.idx = decls.len - 1;
 			array_add((&items), item);
-			uint64_t index = items.len - 1;
-			array_add((&decls), index);
 		} else {
-			error("unknown toplevel item");
+			item.kind = ITEM_EXPR;
+			item.idx = parseexpr(&tok);
+			array_add((&items), item);
 		}
 	}
 
@@ -433,22 +437,24 @@ main(int argc, char *argv[])
 
 	for (int i = 0; i < items.len; i++) {
 		struct item *item = &items.data[i];
-		if (item->kind == ITEM_CALL) {
-			if (memcmp(item->d.call.s.ptr, "syscall", 7) == 0) {
-				size_t len = gensyscall(NULL, &(item->d.call.params));
+		if (item->kind == ITEM_EXPR) {
+			// 7 should not be hardcoded here
+			int len = exprs.data[item->idx].d.call.name.len > 7 ? 7 : exprs.data[item->idx].d.call.name.len;
+			if (memcmp(exprs.data[item->idx].d.call.name.ptr, "syscall", len) == 0) {
+				size_t len = gensyscall(NULL, &(exprs.data[item->idx].d.call.params));
 				char *fcode = malloc(len);
 				if (!fcode)
 					error("gensyscall malloc failed");
 
-				gensyscall(fcode, &(item->d.call.params));
+				gensyscall(fcode, &(exprs.data[item->idx].d.call.params));
 				array_push((&text), fcode, len);
 
 				free(fcode);
 			}
 		} else if (item->kind == ITEM_DECL) {
-			struct expr *expr = &exprs.data[item->d.decl.val];
+			struct expr *expr = &exprs.data[decls.data[item->idx].val];
 			if (expr->kind == EXPR_LIT && expr->d.v.type == P_INT) {
-				item->d.decl.addr = data_pushint(expr->d.v.v.val);
+				decls.data[item->idx].addr = data_pushint(expr->d.v.v.val);
 			} else {
 			error("cannot allocate memory for expression");
 			}

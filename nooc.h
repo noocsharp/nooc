@@ -31,11 +31,11 @@ struct token {
 struct fparams {
 	size_t cap;
 	size_t len;
-	size_t *data;
+	size_t *data; // struct exprs
 };
 
 struct fcall {
-	struct slice s;
+	struct slice name;
 	struct fparams params;
 };
 
@@ -43,6 +43,12 @@ struct decl {
 	struct slice s;
 	size_t val; // struct exprs
 	size_t addr;
+};
+
+struct decls {
+	size_t cap;
+	size_t len;
+	struct decl *data;
 };
 
 struct data {
@@ -54,24 +60,15 @@ struct data {
 struct item {
 	enum {
 		ITEM_DECL,
-		ITEM_CALL
+		ITEM_EXPR
 	} kind;
-	union {
-		struct decl decl;
-		struct fcall call;
-	} d;
+	size_t idx;
 };
 
 struct items {
 	size_t cap;
 	size_t len;
 	struct item *data;
-};
-
-struct decls {
-	size_t cap;
-	size_t len;
-	uint64_t *data;
 };
 
 enum primitive {
@@ -95,7 +92,8 @@ struct value {
 enum exprkind {
 	EXPR_LIT,
 	EXPR_IDENT,
-	EXPR_BINARY
+	EXPR_BINARY,
+	EXPR_FCALL
 };
 
 struct expr {
@@ -104,6 +102,7 @@ struct expr {
 		struct value v;
 		enum binop op;
 		struct slice s;
+		struct fcall call;
 	} d;
 	size_t left;
 	size_t right;
