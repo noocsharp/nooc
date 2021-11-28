@@ -226,6 +226,13 @@ parseexpr(struct token **tok)
 {
 	struct expr expr = { 0 };
 	switch ((*tok)->type) {
+	case TOK_LPAREN:
+		*tok = (*tok)->next;
+		size_t ret = parseexpr(tok);
+		expect(*tok, TOK_RPAREN);
+		*tok = (*tok)->next;
+		return ret;
+		break;
 	case TOK_NAME:
 		// a function call
 		if ((*tok)->next && (*tok)->next->type == TOK_LPAREN) {
