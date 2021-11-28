@@ -107,7 +107,7 @@ add_r64_r64(char *buf, enum reg reg1, enum reg reg2)
 size_t
 sub_r64_r64(char *buf, enum reg reg1, enum reg reg2)
 {
-	uint8_t mov[] = {0x48, 0x29};
+	uint8_t mov[] = {0x48, 0x2B};
 	uint8_t op = (MOD_DIRECT << 6) | (reg1 << 3) | reg2;
 	if (buf) {
 		memcpy(buf, mov, 2);
