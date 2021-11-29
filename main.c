@@ -304,9 +304,17 @@ parse(struct token *tok)
 		item = (struct item){ 0 };
 		expect(tok, TOK_NAME);
 		name = tok;
-		if (tok->next && tok->next->type == TOK_EQUAL) {
+		if (tok->next && tok->next->type == TOK_NAME && tok->next->next && tok->next->next->type == TOK_EQUAL) {
 			struct decl decl;
 			item.kind = ITEM_DECL;
+			tok = tok->next;
+
+			if (strncmp(tok->slice.ptr, "i64", 3) == 0) {
+				decl.type = TYPE_I64;
+			} else {
+				error("unknown type");
+			}
+
 			tok = tok->next->next;
 
 			decl.val = parseexpr(&tok);
@@ -323,6 +331,31 @@ parse(struct token *tok)
 	}
 
 	return items;
+}
+
+void
+typecheck(struct items items)
+{
+	for (size_t i = 0; i < items.len; i++) {
+		switch (items.data[i].kind) {
+		case ITEM_DECL:
+			struct decl *decl = &decls.data[items.data[i].idx];
+			switch (decl->type) {
+			case TYPE_I64:
+				struct expr *expr = &exprs.data[decl->val];
+				// FIXME: we should be able to deal with binary, ident or fcalls
+				if (expr->kind != EXPR_LIT || expr->d.v.type != P_INT) error("expected integer value for integer declaration");
+				break;
+			default:
+				error("unknown decl type");
+			}
+			break;
+		case ITEM_EXPR:
+			break;
+		default:
+			error("unknown item type");
+		}
+	}
 }
 
 size_t
@@ -431,6 +464,7 @@ main(int argc, char *argv[])
 
 	struct token *head = lex((struct slice){addr, statbuf.st_size});
 	struct items items = parse(head);
+	typecheck(items);
 	curitems = &items;
 
 	FILE *out = fopen(argv[2], "w");

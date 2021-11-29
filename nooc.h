@@ -39,8 +39,14 @@ struct fcall {
 	struct fparams params;
 };
 
+// FIXME: make a struct for more complex types
+enum type {
+	TYPE_I64
+};
+
 struct decl {
 	struct slice s;
+	enum type type;
 	size_t val; // struct exprs
 	size_t addr;
 };
