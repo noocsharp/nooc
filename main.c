@@ -452,8 +452,10 @@ struct stat statbuf;
 int
 main(int argc, char *argv[])
 {
-	if (argc < 3)
+	if (argc < 3) {
+		fprintf(stderr, "not enough args\n");
 		return 1;
+	}
 
 	int in = open(argv[1], 0, O_RDONLY);
 	if (in < 0) {
