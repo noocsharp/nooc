@@ -41,7 +41,8 @@ struct fcall {
 
 // FIXME: make a struct for more complex types
 enum type {
-	TYPE_I64
+	TYPE_I64,
+	TYPE_STR
 };
 
 struct decl {

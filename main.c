@@ -311,6 +311,8 @@ parse(struct token *tok)
 
 			if (strncmp(tok->slice.ptr, "i64", 3) == 0) {
 				decl.type = TYPE_I64;
+			} else if (strncmp(tok->slice.ptr, "str", 3) == 0) {
+				decl.type = TYPE_STR;
 			} else {
 				error("unknown type");
 			}
@@ -337,14 +339,20 @@ void
 typecheck(struct items items)
 {
 	for (size_t i = 0; i < items.len; i++) {
+		struct expr *expr;
 		switch (items.data[i].kind) {
 		case ITEM_DECL:
 			struct decl *decl = &decls.data[items.data[i].idx];
 			switch (decl->type) {
 			case TYPE_I64:
-				struct expr *expr = &exprs.data[decl->val];
+				expr = &exprs.data[decl->val];
 				// FIXME: we should be able to deal with binary, ident or fcalls
 				if (expr->kind != EXPR_LIT || expr->d.v.type != P_INT) error("expected integer value for integer declaration");
+				break;
+			case TYPE_STR:
+				expr = &exprs.data[decl->val];
+				// FIXME: we should be able to deal with ident or fcalls
+				if (expr->kind != EXPR_LIT || expr->d.v.type != P_STR) error("expected string value for string declaration");
 				break;
 			default:
 				error("unknown decl type");
@@ -494,10 +502,15 @@ main(int argc, char *argv[])
 			}
 		} else if (item->kind == ITEM_DECL) {
 			struct expr *expr = &exprs.data[decls.data[item->idx].val];
-			if (expr->kind == EXPR_LIT && expr->d.v.type == P_INT) {
-				decls.data[item->idx].addr = data_pushint(expr->d.v.v.val);
+			if (expr->kind == EXPR_LIT) {
+				if (expr->d.v.type == P_INT) {
+					decls.data[item->idx].addr = data_pushint(expr->d.v.v.val);
+				} else if (expr->d.v.type == P_STR) {
+					size_t addr = data_push(expr->d.v.v.s.ptr, expr->d.v.v.s.len);
+					decls.data[item->idx].addr = data_pushint(addr);
+				}
 			} else {
-			error("cannot allocate memory for expression");
+				error("cannot allocate memory for expression");
 			}
 		} else {
 			error("cannot generate code for type");
