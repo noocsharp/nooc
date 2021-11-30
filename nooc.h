@@ -78,18 +78,12 @@ struct items {
 	struct item *data;
 };
 
-enum primitive {
-	P_INT,
-	P_STR,
-};
-
 enum binop {
 	OP_PLUS,
 	OP_MINUS,
 };
 
 struct value {
-	enum primitive type;
 	union {
 		uint64_t val;
 		struct slice s;
@@ -103,8 +97,14 @@ enum exprkind {
 	EXPR_FCALL
 };
 
+enum class {
+	C_INT,
+	C_STR,
+};
+
 struct expr {
 	enum exprkind kind;
+	enum class class;
 	union {
 		struct value v;
 		enum binop op;

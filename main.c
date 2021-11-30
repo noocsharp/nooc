@@ -168,14 +168,14 @@ char *exprkind_str(enum exprkind kind)
 struct exprs exprs;
 
 void
-dumpval(struct value v)
+dumpval(struct expr *e)
 {
-	switch (v.type) {
-	case P_INT:
-		fprintf(stderr, "%ld", v.v.val);
+	switch (e->class) {
+	case C_INT:
+		fprintf(stderr, "%ld", e->d.v.v.val);
 		break;
-	case P_STR: {
-		fprintf(stderr, "\"%.*s\"", v.v.s.len, v.v.s.ptr);
+	case C_STR: {
+		fprintf(stderr, "\"%.*s\"", e->d.v.v.s.len, e->d.v.v.s.ptr);
 		break;
 	}
 	}
@@ -207,7 +207,7 @@ dumpexpr(int indent, struct expr *expr)
 		fprintf(stderr, "%.*s\n", expr->d.s.len, expr->d.s.ptr);
 		break;
 	case EXPR_LIT:
-		dumpval(expr->d.v);
+		dumpval(expr);
 		fprintf(stderr, "\n");
 		break;
 	case EXPR_BINARY:
@@ -258,7 +258,7 @@ parseexpr(struct token **tok)
 		break;
 	case TOK_NUM:
 		expr.kind = EXPR_LIT;
-		expr.d.v.type = P_INT;
+		expr.class = C_INT;
 		// FIXME: error check
 		expr.d.v.v.val = strtol((*tok)->slice.ptr, NULL, 10);
 		*tok = (*tok)->next;
@@ -266,20 +266,21 @@ parseexpr(struct token **tok)
 	case TOK_PLUS:
 		expr.kind = EXPR_BINARY;
 		expr.d.op = OP_PLUS;
-		*tok = (*tok)->next;
-		expr.left = parseexpr(tok);
-		expr.right = parseexpr(tok);
-		break;
+		goto binary_common;
 	case TOK_MINUS:
 		expr.kind = EXPR_BINARY;
 		expr.d.op = OP_MINUS;
+binary_common:
 		*tok = (*tok)->next;
 		expr.left = parseexpr(tok);
 		expr.right = parseexpr(tok);
+		if (exprs.data[expr.left].class != exprs.data[expr.right].class)
+			error("expected binary expression operands to be of same class");
+		expr.class = exprs.data[expr.left].class;
 		break;
 	case TOK_STRING:
 		expr.kind = EXPR_LIT;
-		expr.d.v.type = P_STR;
+		expr.class = C_STR;
 		expr.d.v.v.s = (*tok)->slice;
 		*tok = (*tok)->next;
 		break;
@@ -346,13 +347,13 @@ typecheck(struct items items)
 			switch (decl->type) {
 			case TYPE_I64:
 				expr = &exprs.data[decl->val];
-				// FIXME: we should be able to deal with binary, ident or fcalls
-				if (expr->kind != EXPR_LIT || expr->d.v.type != P_INT) error("expected integer value for integer declaration");
+				// FIXME: we should be able to deal with ident or fcalls
+				if (expr->class != C_INT) error("expected integer expression for integer declaration");
 				break;
 			case TYPE_STR:
 				expr = &exprs.data[decl->val];
 				// FIXME: we should be able to deal with ident or fcalls
-				if (expr->kind != EXPR_LIT || expr->d.v.type != P_STR) error("expected string value for string declaration");
+				if (expr->class != C_STR) error("expected string expression for string declaration");
 				break;
 			default:
 				error("unknown decl type");
@@ -373,11 +374,11 @@ genexpr(char *buf, size_t idx, enum reg reg)
 	char *ptr = buf;
 	struct expr *expr = &exprs.data[idx];
 	if (expr->kind == EXPR_LIT) {
-		switch (expr->d.v.type) {
-		case P_INT:
+		switch (expr->class) {
+		case C_INT:
 			len = mov_r_imm(ptr ? ptr + len : ptr, reg, expr->d.v.v.val);
 			break;
-		case P_STR: {
+		case C_STR: {
 			int addr = data_push(expr->d.v.v.s.ptr, expr->d.v.v.s.len);
 			len = mov_r_imm(ptr ? ptr + len : ptr, reg, addr);
 			break;
@@ -505,9 +506,9 @@ main(int argc, char *argv[])
 		} else if (item->kind == ITEM_DECL) {
 			struct expr *expr = &exprs.data[decls.data[item->idx].val];
 			if (expr->kind == EXPR_LIT) {
-				if (expr->d.v.type == P_INT) {
+				if (expr->class == C_INT) {
 					decls.data[item->idx].addr = data_pushint(expr->d.v.v.val);
-				} else if (expr->d.v.type == P_STR) {
+				} else if (expr->class == C_STR) {
 					size_t addr = data_push(expr->d.v.v.s.ptr, expr->d.v.v.s.len);
 					decls.data[item->idx].addr = data_pushint(addr);
 				}
