@@ -505,15 +505,32 @@ main(int argc, char *argv[])
 			}
 		} else if (item->kind == ITEM_DECL) {
 			struct expr *expr = &exprs.data[decls.data[item->idx].val];
-			if (expr->kind == EXPR_LIT) {
-				if (expr->class == C_INT) {
+			switch (expr->class) {
+			case C_INT:
+				// this is sort of an optimization, since we write at compile-time instead of evaluating and storing. should this happen here in the long term?
+				if (expr->kind == EXPR_LIT) {
 					decls.data[item->idx].addr = data_pushint(expr->d.v.v.val);
-				} else if (expr->class == C_STR) {
-					size_t addr = data_push(expr->d.v.v.s.ptr, expr->d.v.v.s.len);
-					decls.data[item->idx].addr = data_pushint(addr);
+				} else {
+					decls.data[item->idx].addr = data_pushint(0);
+					enum reg reg = getreg();
+					size_t exprlen = genexpr(NULL, decls.data[item->idx].val, reg);
+					size_t movlen =  mov_m64_r64(NULL, decls.data[item->idx].addr, reg);
+					char *code = malloc(exprlen + movlen);
+					if (!code)
+						error("genexpr malloc failed");
+
+					genexpr(code, decls.data[item->idx].val, reg);
+					mov_m64_r64(code + exprlen, decls.data[item->idx].addr, reg);
+					array_push((&text), code, exprlen + movlen);
+					freereg(reg);
 				}
-			} else {
-				error("cannot allocate memory for expression");
+				break;
+			// FIXME: we assume that any string is a literal, may break if we add binary operands on strings in the future.
+			case C_STR:
+				decls.data[item->idx].addr = data_pushint(data_push(expr->d.v.v.s.ptr, expr->d.v.v.s.len));
+				break;
+			default:
+				error("cannot generate code for unknown expression class");
 			}
 		} else {
 			error("cannot generate code for type");

@@ -48,7 +48,7 @@ elf(char *text, size_t len, char* data, size_t dlen, FILE *f)
 	phdr_data.p_paddr = DATA_OFFSET;
 	phdr_data.p_filesz = dlen;
 	phdr_data.p_memsz = dlen;
-	phdr_data.p_flags = PF_R;
+	phdr_data.p_flags = PF_R | PF_W;
 	phdr_data.p_align = 0x1000;
 
 	fwrite(&ehdr, 1, sizeof(Elf64_Ehdr), f);
