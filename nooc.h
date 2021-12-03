@@ -6,15 +6,21 @@ enum tokentype {
 
 	TOK_LPAREN,
 	TOK_RPAREN,
+	TOK_LCURLY,
+	TOK_RCURLY,
 
 	TOK_PLUS,
 	TOK_MINUS,
+	TOK_GREATER,
 
 	TOK_COMMA,
 	TOK_EQUAL,
 
 	TOK_NUM,
 	TOK_STRING,
+
+	TOK_IF,
+	TOK_ELSE
 };
 
 struct slice {
@@ -72,20 +78,28 @@ struct item {
 	size_t idx;
 };
 
-struct items {
+struct block {
 	size_t cap;
 	size_t len;
 	struct item *data;
 };
 
+struct cond {
+	size_t cond; // struct exprs
+	struct block bif;
+	struct block belse;
+};
+
+
 enum binop {
 	OP_PLUS,
 	OP_MINUS,
+	OP_GREATER,
 };
 
 struct value {
 	union {
-		uint64_t val;
+		uint64_t i;
 		struct slice s;
 	} v;
 };
@@ -94,7 +108,8 @@ enum exprkind {
 	EXPR_LIT,
 	EXPR_IDENT,
 	EXPR_BINARY,
-	EXPR_FCALL
+	EXPR_FCALL,
+	EXPR_COND
 };
 
 enum class {
@@ -110,6 +125,7 @@ struct expr {
 		enum binop op;
 		struct slice s;
 		struct fcall call;
+		struct cond cond;
 	} d;
 	size_t left;
 	size_t right;

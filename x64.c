@@ -137,3 +137,62 @@ sub_r64_r64(char *buf, enum reg reg1, enum reg reg2)
 
 	return 3;
 }
+
+size_t
+cmp_r64_r64(char *buf, enum reg reg1, enum reg reg2)
+{
+	uint8_t mov[] = {0x48, 0x3B};
+	uint8_t op = (MOD_DIRECT << 6) | (reg1 << 3) | reg2;
+	if (buf) {
+		memcpy(buf, mov, 2);
+		buf += 2;
+		*(buf++) = op;
+	}
+
+	return 3;
+}
+
+size_t
+jng(char *buf, int64_t offset)
+{
+	if (-256 <= offset && offset <= 255) {
+		int8_t i = offset;
+		if (buf) {
+			*(buf++) = 0x7E;
+			*(buf++) = i;
+		}
+		return 2;
+	} else {
+		error("unimplemented jng offet!");
+	}
+}
+
+size_t
+jg(char *buf, int64_t offset)
+{
+	if (-256 <= offset && offset <= 255) {
+		int8_t i = offset;
+		if (buf) {
+			*(buf++) = 0x7F;
+			*(buf++) = i;
+		}
+		return 2;
+	} else {
+		error("unimplemented jg offet!");
+	}
+}
+
+size_t
+jmp(char *buf, int64_t offset)
+{
+	if (-256 <= offset && offset <= 255) {
+		int8_t i = offset;
+		if (buf) {
+			*(buf++) = 0xEB;
+			*(buf++) = i;
+		}
+		return 2;
+	} else {
+		error("unimplemented jmp offet!");
+	}
+}

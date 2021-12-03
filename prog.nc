@@ -1,10 +1,8 @@
-write i64 = 1
-stdout i64 = 0
 exit i64 = 60
-len1 i64 = 11
-hello str = "hello "
-world str = "world"
-len2 i64 = + 3 3
-syscall(write, stdout, hello, len2)
-syscall(write, stdout, world, 5)
+write i64 = 1
+if > 1 0 {
+	syscall(write, 0, "hello", 5)
+} else {
+	syscall(write, 0, "world", 5)
+}
 syscall(exit, 0)
