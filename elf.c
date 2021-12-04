@@ -24,7 +24,7 @@ elf(char *text, size_t len, char* data, size_t dlen, FILE *f)
 	ehdr.e_machine = EM_X86_64;
 	ehdr.e_version = EV_CURRENT;
 
-	ehdr.e_entry = 0x1000;
+	ehdr.e_entry = TEXT_OFFSET;
 	ehdr.e_phoff = sizeof(ehdr);
 	ehdr.e_phentsize = sizeof(phdr_text);
 	ehdr.e_phnum = 2;
@@ -35,15 +35,15 @@ elf(char *text, size_t len, char* data, size_t dlen, FILE *f)
 
 	phdr_text.p_type = PT_LOAD;
 	phdr_text.p_offset = 0x1000;
-	phdr_text.p_vaddr = 0x1000;
-	phdr_text.p_paddr = 0x1000;
+	phdr_text.p_vaddr = TEXT_OFFSET;
+	phdr_text.p_paddr = TEXT_OFFSET;
 	phdr_text.p_filesz = len;
 	phdr_text.p_memsz = len;
 	phdr_text.p_flags = PF_R | PF_X;
 	phdr_text.p_align = 0x1000;
 
 	phdr_data.p_type = PT_LOAD;
-	phdr_data.p_offset = DATA_OFFSET;
+	phdr_data.p_offset = 0x2000;
 	phdr_data.p_vaddr = DATA_OFFSET;
 	phdr_data.p_paddr = DATA_OFFSET;
 	phdr_data.p_filesz = dlen;
