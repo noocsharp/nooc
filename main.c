@@ -200,10 +200,9 @@ dumpval(struct expr *e)
 	case C_INT:
 		fprintf(stderr, "%ld", e->d.v.v.i);
 		break;
-	case C_STR: {
-		fprintf(stderr, "\"%.*s\"", e->d.v.v.s.len, e->d.v.v.s.ptr);
+	case C_STR:
+		fprintf(stderr, "\"%.*s\"", (int)e->d.v.v.s.len, e->d.v.v.s.ptr);
 		break;
-	}
 	}
 }
 
@@ -233,7 +232,7 @@ dumpexpr(int indent, struct expr *expr)
 	fprintf(stderr, "%s: ", exprkind_str(expr->kind));
 	switch (expr->kind) {
 	case EXPR_IDENT:
-		fprintf(stderr, "%.*s\n", expr->d.s.len, expr->d.s.ptr);
+		fprintf(stderr, "%.*s\n", (int)expr->d.s.len, expr->d.s.ptr);
 		break;
 	case EXPR_LIT:
 		dumpval(expr);
@@ -249,7 +248,7 @@ dumpexpr(int indent, struct expr *expr)
 		dumpexpr(indent + 8, &exprs.data[expr->d.cond.cond]);
 		break;
 	case EXPR_FCALL:
-		fprintf(stderr, "%.*s\n", expr->d.call.name.len, expr->d.call.name.ptr);
+		fprintf(stderr, "%.*s\n", (int)expr->d.call.name.len, expr->d.call.name.ptr);
 		break;
 	default:
 		error("dumpexpr: bad expression");
@@ -351,7 +350,6 @@ parse(struct token **tok)
 	struct block items = { 0 };
 	struct item item;
 	struct token *name;
-	size_t expr;
 	bool curlies = false;
 
 	if ((*tok)->type == TOK_LCURLY) {
@@ -393,7 +391,7 @@ parse(struct token **tok)
 		}
 	}
 
-	if ((*tok)->type == TOK_RCURLY)
+	if (curlies && (*tok)->type == TOK_RCURLY)
 		*tok = (*tok)->next;
 
 	return items;
@@ -622,6 +620,7 @@ main(int argc, char *argv[])
 	}
 
 	size_t len2 = genblock(text, &items);
+	assert(len == len2);
 
 	FILE *out = fopen(argv[2], "w");
 	if (!out) {
