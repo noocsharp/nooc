@@ -530,7 +530,7 @@ genblock(char *buf, struct block *block)
 				assert(binary->kind == EXPR_BINARY);
 				enum reg reg = getreg();
 				total += genexpr(buf ? buf + total : NULL, expr.d.cond.cond, reg);
-				size_t iflen = genblock(NULL, &expr.d.cond.bif);
+				size_t iflen = genblock(NULL, &expr.d.cond.bif) + jmp(NULL, 0);
 				size_t elselen = genblock(NULL, &expr.d.cond.belse);
 				switch (binary->d.op) {
 				case OP_GREATER:
