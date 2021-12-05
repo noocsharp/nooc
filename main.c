@@ -36,6 +36,9 @@ lex(struct slice start)
 		if (slice_cmplit(&start, "if") == 0) {
 			cur->type = TOK_IF;
 			ADVANCE(2);
+		} else if (slice_cmplit(&start, "let") == 0) {
+			cur->type = TOK_LET;
+			ADVANCE(3);
 		} else if (slice_cmplit(&start, "else") == 0) {
 			cur->type = TOK_ELSE;
 			ADVANCE(4);
@@ -370,7 +373,6 @@ parse(struct token **tok)
 {
 	struct block items = { 0 };
 	struct item item;
-	struct token *name;
 	bool curlies = false;
 
 	if ((*tok)->type == TOK_LCURLY) {
@@ -380,15 +382,16 @@ parse(struct token **tok)
 
 	while ((*tok)->type != TOK_NONE && (*tok)->type != TOK_RCURLY) {
 		item = (struct item){ 0 };
-		if ((*tok)->type != TOK_IF && (*tok)->type != TOK_LOOP) {
-			expect((*tok), TOK_NAME);
-			name = (*tok);
-		}
-		if ((*tok)->next && (*tok)->next->type == TOK_NAME && (*tok)->next->next && (*tok)->next->next->type == TOK_EQUAL) {
+		if ((*tok)->type == TOK_LET) {
 			struct decl decl;
 			item.kind = ITEM_DECL;
-			(*tok) = (*tok)->next;
+			*tok = (*tok)->next;
 
+			expect(*tok, TOK_NAME);
+			decl.s = (*tok)->slice;
+			*tok = (*tok)->next;
+
+			expect(*tok, TOK_NAME);
 			if (strncmp((*tok)->slice.data, "i64", 3) == 0) {
 				decl.type = TYPE_I64;
 			} else if (strncmp((*tok)->slice.data, "str", 3) == 0) {
@@ -397,10 +400,11 @@ parse(struct token **tok)
 				error("unknown type");
 			}
 
-			(*tok) = (*tok)->next->next;
+			*tok = (*tok)->next;
+			expect(*tok, TOK_EQUAL);
+			*tok = (*tok)->next;
 
 			decl.val = parseexpr(tok);
-			decl.s = name->slice;
 			array_add((&decls), decl);
 
 			item.idx = decls.len - 1;

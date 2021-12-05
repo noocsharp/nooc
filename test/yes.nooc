@@ -1,5 +1,5 @@
-write i64 = 1
-stdout i64 = 0
+let write i64 = 1
+let stdout i64 = 0
 loop {
 	syscall(write, stdout, "y\n", 2)
 }

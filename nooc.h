@@ -20,6 +20,7 @@ enum tokentype {
 	TOK_NUM,
 	TOK_STRING,
 
+	TOK_LET,
 	TOK_IF,
 	TOK_ELSE,
 	TOK_LOOP
