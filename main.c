@@ -553,17 +553,8 @@ genblock(char *buf, struct block *block)
 				} else {
 					decls.data[item->idx].addr = data_pushint(0);
 					enum reg reg = getreg();
-					size_t exprlen = genexpr(NULL, decls.data[item->idx].val, reg);
-					size_t movlen =  mov_m64_r64(NULL, decls.data[item->idx].addr, reg);
-					char *code = malloc(exprlen + movlen);
-					if (!code)
-						error("genexpr malloc failed");
-
-					genexpr(code, decls.data[item->idx].val, reg);
-					mov_m64_r64(code + exprlen, decls.data[item->idx].addr, reg);
-					if (buf)
-						memcpy(buf, code, exprlen + movlen);
-					total += exprlen + movlen;
+					total += genexpr(buf ? buf + total : NULL, decls.data[item->idx].val, reg);
+					total += mov_m64_r64(buf ? buf + total : NULL, decls.data[item->idx].addr, reg);
 					freereg(reg);
 				}
 				break;
