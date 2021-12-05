@@ -416,8 +416,10 @@ parse(struct token **tok)
 		}
 	}
 
-	if (curlies && (*tok)->type == TOK_RCURLY)
+	if (curlies) {
+		expect(*tok, TOK_RCURLY);
 		*tok = (*tok)->next;
+	}
 
 	return items;
 }
