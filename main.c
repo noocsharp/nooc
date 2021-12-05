@@ -13,8 +13,8 @@
 
 #include "array.h"
 #include "x64.h"
-#include "util.h"
 #include "nooc.h"
+#include "util.h"
 #include "elf.h"
 
 struct decls decls;
@@ -29,11 +29,11 @@ lex(struct slice start)
 
 	struct token *cur = head;
 	while (start.len) {
-		if (start.len >= 2 && memcmp(start.ptr, "if", 2) == 0) {
+		if (slice_cmplit(&start, "if") == 0) {
 			cur->type = TOK_IF;
 			start.ptr += 2;
 			start.len -= 2;
-		} else if (start.len >= 4 && memcmp(start.ptr, "else", 4) == 0) {
+		} else if (slice_cmplit(&start, "else") == 0) {
 			cur->type = TOK_ELSE;
 			start.ptr += 4;
 			start.len -= 4;
@@ -517,7 +517,7 @@ genblock(char *buf, struct block *block)
 			struct expr expr = exprs.data[item->idx];
 			// FIXME: 7 should not be hardcoded here
 			if (expr.kind == EXPR_FCALL) {
-				if (expr.d.call.name.len == 7 && memcmp(exprs.data[item->idx].d.call.name.ptr, "syscall", 7) == 0) {
+				if (slice_cmplit(&exprs.data[item->idx].d.call.name, "syscall") == 0) {
 					total += gensyscall(buf ? buf + total : NULL, &(exprs.data[item->idx].d.call.params));
 				} else {
 					error("unknown function!");

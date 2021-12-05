@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "nooc.h"
 #include "x64.h"
 #include "util.h"
 
