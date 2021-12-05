@@ -404,6 +404,11 @@ parse(struct token **tok)
 			expect(*tok, TOK_EQUAL);
 			*tok = (*tok)->next;
 
+			// FIXME: scoping
+			if (finddecl(&items, decl.s)) {
+				error("repeat declaration!");
+			}
+
 			decl.val = parseexpr(tok);
 			array_add((&decls), decl);
 
