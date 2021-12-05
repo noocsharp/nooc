@@ -1,8 +1,6 @@
 exit i64 = 60
 write i64 = 1
-if > 0 1 {
+loop {
 	syscall(write, 0, "hello", 5)
-} else {
-	syscall(write, 0, "world", 5)
 }
 syscall(exit, 0)

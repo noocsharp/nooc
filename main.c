@@ -39,6 +39,9 @@ lex(struct slice start)
 		} else if (slice_cmplit(&start, "else") == 0) {
 			cur->type = TOK_ELSE;
 			ADVANCE(4);
+		} else if (slice_cmplit(&start, "loop") == 0) {
+			cur->type = TOK_LOOP;
+			ADVANCE(4);
 		} else if (isblank(*start.ptr)) {
 			ADVANCE(1);
 			continue;
@@ -248,6 +251,11 @@ parseexpr(struct token **tok)
 {
 	struct expr expr = { 0 };
 	switch ((*tok)->type) {
+	case TOK_LOOP:
+		*tok = (*tok)->next;
+		expr.kind = EXPR_LOOP;
+		expr.d.loop.block = parse(tok);
+		break;
 	case TOK_IF:
 		*tok = (*tok)->next;
 		expr.kind = EXPR_COND;
@@ -345,7 +353,7 @@ parse(struct token **tok)
 
 	while ((*tok)->type != TOK_NONE && (*tok)->type != TOK_RCURLY) {
 		item = (struct item){ 0 };
-		if ((*tok)->type != TOK_IF) {
+		if ((*tok)->type != TOK_IF && (*tok)->type != TOK_LOOP) {
 			expect((*tok), TOK_NAME);
 			name = (*tok);
 		}
@@ -526,6 +534,10 @@ genblock(char *buf, struct block *block)
 				total += genblock(buf ? buf + total : NULL, &expr.d.cond.bif);
 				total += jmp(buf ? buf + total: NULL, elselen);
 				total += genblock(buf ? buf + total : NULL, &expr.d.cond.belse);
+			} else if (expr.kind == EXPR_LOOP) {
+				size_t back = genblock(NULL, &expr.d.loop.block) + jmp(NULL, 0);
+				total += genblock(buf ? buf + total : NULL, &expr.d.loop.block);
+				total += jmp(buf ? buf + total: NULL, -back);
 			} else {
 				error("unhandled toplevel expression type!");
 			}

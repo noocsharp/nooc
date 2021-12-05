@@ -21,7 +21,8 @@ enum tokentype {
 	TOK_STRING,
 
 	TOK_IF,
-	TOK_ELSE
+	TOK_ELSE,
+	TOK_LOOP
 };
 
 struct slice {
@@ -91,6 +92,10 @@ struct cond {
 	struct block belse;
 };
 
+struct loop {
+	struct block block;
+};
+
 
 enum binop {
 	OP_PLUS,
@@ -110,7 +115,8 @@ enum exprkind {
 	EXPR_IDENT,
 	EXPR_BINARY,
 	EXPR_FCALL,
-	EXPR_COND
+	EXPR_COND,
+	EXPR_LOOP
 };
 
 enum class {
@@ -127,6 +133,7 @@ struct expr {
 		struct slice s;
 		struct fcall call;
 		struct cond cond;
+		struct loop loop;
 	} d;
 	size_t left;
 	size_t right;
