@@ -380,7 +380,7 @@ parse(struct token **tok)
 			array_add((&items), item);
 		} else {
 			item.kind = ITEM_EXPR;
-			item.idx = parseexpr(&(*tok));
+			item.idx = parseexpr(tok);
 			array_add((&items), item);
 		}
 	}
