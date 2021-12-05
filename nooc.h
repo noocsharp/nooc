@@ -26,8 +26,9 @@ enum tokentype {
 };
 
 struct slice {
-	char *ptr;
+	size_t cap;
 	size_t len;
+	char *data;
 };
 
 struct token {

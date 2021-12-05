@@ -14,7 +14,7 @@ slice_cmplit(struct slice *s1, char *s2)
 	if (s1->len < len)
 		return 1;
 
-	return memcmp(s1->ptr, s2, len);
+	return memcmp(s1->data, s2, len);
 }
 
 void

@@ -21,7 +21,7 @@ struct decls decls;
 struct exprs exprs;
 
 #define ADVANCE(n) \
-			start.ptr += (n) ; \
+			start.data += (n) ; \
 			start.len -= (n) ;
 
 struct token *
@@ -42,64 +42,64 @@ lex(struct slice start)
 		} else if (slice_cmplit(&start, "loop") == 0) {
 			cur->type = TOK_LOOP;
 			ADVANCE(4);
-		} else if (isblank(*start.ptr)) {
+		} else if (isblank(*start.data)) {
 			ADVANCE(1);
 			continue;
-		} else if (*start.ptr == '>') {
+		} else if (*start.data == '>') {
 			cur->type = TOK_GREATER;
 			ADVANCE(1);
-		} else if (*start.ptr == ',') {
+		} else if (*start.data == ',') {
 			cur->type = TOK_COMMA;
 			ADVANCE(1);
-		} else if (*start.ptr == '(') {
+		} else if (*start.data == '(') {
 			cur->type = TOK_LPAREN;
 			ADVANCE(1);
-		} else if (*start.ptr == ')') {
+		} else if (*start.data == ')') {
 			cur->type = TOK_RPAREN;
 			ADVANCE(1);
-		} else if (*start.ptr == '{') {
+		} else if (*start.data == '{') {
 			cur->type = TOK_LCURLY;
 			ADVANCE(1);
-		} else if (*start.ptr == '}') {
+		} else if (*start.data == '}') {
 			cur->type = TOK_RCURLY;
 			ADVANCE(1);
-		} else if (isdigit(*start.ptr)) {
-			cur->slice.ptr = start.ptr;
+		} else if (isdigit(*start.data)) {
+			cur->slice.data = start.data;
 			cur->slice.len = 1;
 			ADVANCE(1);
 			cur->type = TOK_NUM;
-			while (isdigit(*start.ptr)) {
+			while (isdigit(*start.data)) {
 				ADVANCE(1);
 				cur->slice.len++;
 			}
-		} else if (*start.ptr == '"') {
+		} else if (*start.data == '"') {
 			ADVANCE(1);
-			cur->slice.ptr = start.ptr;
+			cur->slice.data = start.data;
 			cur->type = TOK_STRING;
-			while (*start.ptr != '"') {
+			while (*start.data != '"') {
 				ADVANCE(1);
 				cur->slice.len++;
 			}
 
 			ADVANCE(1);
-		} else if (*start.ptr == '\n') {
+		} else if (*start.data == '\n') {
 			ADVANCE(1);
 			continue;
-		} else if (*start.ptr == '+') {
+		} else if (*start.data == '+') {
 			cur->type = TOK_PLUS;
 			ADVANCE(1);
-		} else if (*start.ptr == '-') {
+		} else if (*start.data == '-') {
 			cur->type = TOK_MINUS;
 			ADVANCE(1);
-		} else if (*start.ptr == '=') {
+		} else if (*start.data == '=') {
 			cur->type = TOK_EQUAL;
 			ADVANCE(1);
-		} else if (isalpha(*start.ptr)) {
+		} else if (isalpha(*start.data)) {
 			cur->type = TOK_NAME;
-			cur->slice.ptr = start.ptr;
+			cur->slice.data = start.data;
 			cur->slice.len = 1;
 			ADVANCE(1);
-			while (isalnum(*start.ptr)) {
+			while (isalnum(*start.data)) {
 				ADVANCE(1);
 				cur->slice.len++;
 			}
@@ -128,8 +128,9 @@ expect(struct token *tok, enum tokentype type)
 {
 	if (!tok)
 		error("unexpected null token!");
-	if (tok->type != type)
+	if (tok->type != type) {
 		error("mismatch");
+	}
 }
 
 uint64_t
@@ -154,7 +155,7 @@ finddecl(struct block *items, struct slice s)
 	for (int i = 0; i < decls.len; i++) {
 		struct decl *decl = &(decls.data[i]);
 		size_t len = s.len < decl->s.len ? s.len : decl->s.len;
-		if (memcmp(s.ptr, decl->s.ptr, len) == 0) {
+		if (memcmp(s.data, decl->s.data, len) == 0) {
 			return decl;
 		}
 	}
@@ -190,7 +191,7 @@ dumpval(struct expr *e)
 		fprintf(stderr, "%ld", e->d.v.v.i);
 		break;
 	case C_STR:
-		fprintf(stderr, "\"%.*s\"", (int)e->d.v.v.s.len, e->d.v.v.s.ptr);
+		fprintf(stderr, "\"%.*s\"", (int)e->d.v.v.s.len, e->d.v.v.s.data);
 		break;
 	}
 }
@@ -221,7 +222,7 @@ dumpexpr(int indent, struct expr *expr)
 	fprintf(stderr, "%s: ", exprkind_str(expr->kind));
 	switch (expr->kind) {
 	case EXPR_IDENT:
-		fprintf(stderr, "%.*s\n", (int)expr->d.s.len, expr->d.s.ptr);
+		fprintf(stderr, "%.*s\n", (int)expr->d.s.len, expr->d.s.data);
 		break;
 	case EXPR_LIT:
 		dumpval(expr);
@@ -237,7 +238,7 @@ dumpexpr(int indent, struct expr *expr)
 		dumpexpr(indent + 8, &exprs.data[expr->d.cond.cond]);
 		break;
 	case EXPR_FCALL:
-		fprintf(stderr, "%.*s\n", (int)expr->d.call.name.len, expr->d.call.name.ptr);
+		fprintf(stderr, "%.*s\n", (int)expr->d.call.name.len, expr->d.call.name.data);
 		break;
 	default:
 		error("dumpexpr: bad expression");
@@ -301,7 +302,7 @@ parseexpr(struct token **tok)
 		expr.kind = EXPR_LIT;
 		expr.class = C_INT;
 		// FIXME: error check
-		expr.d.v.v.i = strtol((*tok)->slice.ptr, NULL, 10);
+		expr.d.v.v.i = strtol((*tok)->slice.data, NULL, 10);
 		*tok = (*tok)->next;
 		break;
 	case TOK_GREATER:
@@ -326,7 +327,33 @@ binary_common:
 	case TOK_STRING:
 		expr.kind = EXPR_LIT;
 		expr.class = C_STR;
-		expr.d.v.v.s = (*tok)->slice;
+		expr.d.v.v.s = (struct slice){ 0 };
+		struct slice str = (*tok)->slice;
+		for (size_t i = 0; i < str.len; i++) {
+			switch (str.data[i]) {
+			case '\\':
+				if (++i < str.len) {
+					char c;
+					switch (str.data[i]) {
+					case 'n':
+						c = '\n';
+						array_add((&expr.d.v.v.s), c);
+						break;
+					case '\\':
+						c = '\\';
+						array_add((&expr.d.v.v.s), c);
+						break;
+					default:
+						error("invalid string escape!");
+					}
+				} else {
+					error("string escape without parameter");
+				}
+				break;
+			default:
+				array_add((&expr.d.v.v.s), str.data[i]);
+			}
+		}
 		*tok = (*tok)->next;
 		break;
 	default:
@@ -362,9 +389,9 @@ parse(struct token **tok)
 			item.kind = ITEM_DECL;
 			(*tok) = (*tok)->next;
 
-			if (strncmp((*tok)->slice.ptr, "i64", 3) == 0) {
+			if (strncmp((*tok)->slice.data, "i64", 3) == 0) {
 				decl.type = TYPE_I64;
-			} else if (strncmp((*tok)->slice.ptr, "str", 3) == 0) {
+			} else if (strncmp((*tok)->slice.data, "str", 3) == 0) {
 				decl.type = TYPE_STR;
 			} else {
 				error("unknown type");
@@ -434,7 +461,7 @@ genexpr(char *buf, size_t idx, enum reg reg)
 			len = mov_r_imm(ptr ? ptr + len : ptr, reg, expr->d.v.v.i);
 			break;
 		case C_STR: {
-			int addr = data_push(expr->d.v.v.s.ptr, expr->d.v.v.s.len);
+			int addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
 			len = mov_r_imm(ptr ? ptr + len : ptr, reg, addr);
 			break;
 		}
@@ -558,7 +585,7 @@ genblock(char *buf, struct block *block)
 				break;
 			// FIXME: we assume that any string is a literal, may break if we add binary operands on strings in the future.
 			case C_STR:
-				decls.data[item->idx].addr = data_pushint(data_push(expr->d.v.v.s.ptr, expr->d.v.v.s.len));
+				decls.data[item->idx].addr = data_pushint(data_push(expr->d.v.v.s.data, expr->d.v.v.s.len));
 				break;
 			default:
 				error("cannot generate code for unknown expression class");
@@ -596,7 +623,7 @@ main(int argc, char *argv[])
 	char *addr = mmap(NULL, statbuf.st_size, PROT_READ, MAP_PRIVATE, in, 0);
 	close(in);
 
-	struct token *head = lex((struct slice){addr, statbuf.st_size});
+	struct token *head = lex((struct slice){statbuf.st_size, statbuf.st_size, addr});
 	struct token *curtoken = head;
 	struct block items = parse(&curtoken);
 	typecheck(items);
