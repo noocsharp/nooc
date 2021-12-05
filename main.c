@@ -20,6 +20,10 @@
 struct decls decls;
 struct exprs exprs;
 
+#define ADVANCE(n) \
+			start.ptr += (n) ; \
+			start.len -= (n) ;
+
 struct token *
 lex(struct slice start)
 {
@@ -31,89 +35,69 @@ lex(struct slice start)
 	while (start.len) {
 		if (slice_cmplit(&start, "if") == 0) {
 			cur->type = TOK_IF;
-			start.ptr += 2;
-			start.len -= 2;
+			ADVANCE(2);
 		} else if (slice_cmplit(&start, "else") == 0) {
 			cur->type = TOK_ELSE;
-			start.ptr += 4;
-			start.len -= 4;
+			ADVANCE(4);
 		} else if (isblank(*start.ptr)) {
-			start.ptr += 1;
-			start.len -= 1;
+			ADVANCE(1);
 			continue;
 		} else if (*start.ptr == '>') {
 			cur->type = TOK_GREATER;
-			start.ptr += 1;
-			start.len -= 1;
+			ADVANCE(1);
 		} else if (*start.ptr == ',') {
 			cur->type = TOK_COMMA;
-			start.ptr += 1;
-			start.len -= 1;
+			ADVANCE(1);
 		} else if (*start.ptr == '(') {
 			cur->type = TOK_LPAREN;
-			start.ptr += 1;
-			start.len -= 1;
+			ADVANCE(1);
 		} else if (*start.ptr == ')') {
 			cur->type = TOK_RPAREN;
-			start.ptr += 1;
-			start.len -= 1;
+			ADVANCE(1);
 		} else if (*start.ptr == '{') {
 			cur->type = TOK_LCURLY;
-			start.ptr += 1;
-			start.len -= 1;
+			ADVANCE(1);
 		} else if (*start.ptr == '}') {
 			cur->type = TOK_RCURLY;
-			start.ptr += 1;
-			start.len -= 1;
+			ADVANCE(1);
 		} else if (isdigit(*start.ptr)) {
 			cur->slice.ptr = start.ptr;
 			cur->slice.len = 1;
-			start.ptr++;
-			start.len--;
+			ADVANCE(1);
 			cur->type = TOK_NUM;
 			while (isdigit(*start.ptr)) {
-				start.ptr++;
-				start.len--;
+				ADVANCE(1);
 				cur->slice.len++;
 			}
 		} else if (*start.ptr == '"') {
-			start.ptr++;
-			start.len--;
+			ADVANCE(1);
 			cur->slice.ptr = start.ptr;
 			cur->type = TOK_STRING;
 			while (*start.ptr != '"') {
-				start.ptr++;
-				start.len--;
+				ADVANCE(1);
 				cur->slice.len++;
 			}
 
-			start.ptr++;
-			start.len--;
+			ADVANCE(1);
 		} else if (*start.ptr == '\n') {
-			start.ptr++;
-			start.len--;
+			ADVANCE(1);
 			continue;
 		} else if (*start.ptr == '+') {
 			cur->type = TOK_PLUS;
-			start.ptr++;
-			start.len--;
+			ADVANCE(1);
 		} else if (*start.ptr == '-') {
 			cur->type = TOK_MINUS;
-			start.ptr++;
-			start.len--;
+			ADVANCE(1);
 		} else if (*start.ptr == '=') {
 			cur->type = TOK_EQUAL;
-			start.ptr++;
-			start.len--;
+			ADVANCE(1);
 		} else if (isalpha(*start.ptr)) {
 			cur->type = TOK_NAME;
 			cur->slice.ptr = start.ptr;
 			cur->slice.len = 1;
-			start.ptr++;
-			start.len--;
+			ADVANCE(1);
 			while (isalnum(*start.ptr)) {
-				start.ptr++;
-				start.len--;
+				ADVANCE(1);
 				cur->slice.len++;
 			}
 		} else {
@@ -131,6 +115,8 @@ lex(struct slice start)
 
 	return head;
 }
+
+#undef ADVANCE
 
 struct data data_seg;
 
