@@ -18,6 +18,7 @@
 #include "elf.h"
 
 struct decls decls;
+struct assgns assgns;
 struct exprs exprs;
 
 #define ADVANCE(n) \
@@ -383,7 +384,7 @@ parse(struct token **tok)
 	while ((*tok)->type != TOK_NONE && (*tok)->type != TOK_RCURLY) {
 		item = (struct item){ 0 };
 		if ((*tok)->type == TOK_LET) {
-			struct decl decl;
+			struct decl decl = { 0 };
 			item.kind = ITEM_DECL;
 			*tok = (*tok)->next;
 
@@ -414,6 +415,17 @@ parse(struct token **tok)
 
 			item.idx = decls.len - 1;
 			array_add((&items), item);
+		} else if ((*tok)->type == TOK_NAME && (*tok)->next && (*tok)->next->type == TOK_EQUAL) {
+			struct assgn assgn;
+			item.kind = ITEM_ASSGN;
+			assgn.s = (*tok)->slice;
+
+			*tok = (*tok)->next->next;
+			assgn.val = parseexpr(tok);
+			array_add((&assgns), assgn);
+
+			item.idx = assgns.len - 1;
+			array_add((&items), item);
 		} else {
 			item.kind = ITEM_EXPR;
 			item.idx = parseexpr(tok);
@@ -434,9 +446,10 @@ typecheck(struct block items)
 {
 	for (size_t i = 0; i < items.len; i++) {
 		struct expr *expr;
+		struct decl *decl;
 		switch (items.data[i].kind) {
 		case ITEM_DECL:
-			struct decl *decl = &decls.data[items.data[i].idx];
+			decl = &decls.data[items.data[i].idx];
 			switch (decl->type) {
 			case TYPE_I64:
 				expr = &exprs.data[decl->val];
@@ -447,6 +460,26 @@ typecheck(struct block items)
 				expr = &exprs.data[decl->val];
 				// FIXME: we should be able to deal with ident or fcalls
 				if (expr->class != C_STR) error("expected string expression for string declaration");
+				break;
+			default:
+				error("unknown decl type");
+			}
+			break;
+		case ITEM_ASSGN:
+			struct assgn *assgn = &assgns.data[items.data[i].idx];
+			decl = finddecl(&items, assgn->s);
+			if (decl == NULL)
+				error("unknown name");
+			switch (decl->type) {
+			case TYPE_I64:
+				expr = &exprs.data[assgn->val];
+				// FIXME: we should be able to deal with ident or fcalls
+				if (expr->class != C_INT) error("expected integer expression for integer variable");
+				break;
+			case TYPE_STR:
+				expr = &exprs.data[assgn->val];
+				// FIXME: we should be able to deal with ident or fcalls
+				if (expr->class != C_STR) error("expected string expression for string variable");
 				break;
 			default:
 				error("unknown decl type");
@@ -585,9 +618,11 @@ genblock(char *buf, struct block *block)
 			case C_INT:
 				// this is sort of an optimization, since we write at compile-time instead of evaluating and storing. should this happen here in the long term?
 				if (expr->kind == EXPR_LIT) {
-					decls.data[item->idx].addr = data_pushint(expr->d.v.v.i);
+					if (buf)
+						decls.data[item->idx].addr = data_pushint(expr->d.v.v.i);
 				} else {
-					decls.data[item->idx].addr = data_pushint(0);
+					if (buf)
+						decls.data[item->idx].addr = data_pushint(0);
 					enum reg reg = getreg();
 					total += genexpr(buf ? buf + total : NULL, decls.data[item->idx].val, reg);
 					total += mov_m64_r64(buf ? buf + total : NULL, decls.data[item->idx].addr, reg);
@@ -596,7 +631,35 @@ genblock(char *buf, struct block *block)
 				break;
 			// FIXME: we assume that any string is a literal, may break if we add binary operands on strings in the future.
 			case C_STR:
-				decls.data[item->idx].addr = data_pushint(data_push(expr->d.v.v.s.data, expr->d.v.v.s.len));
+				if (buf)
+					decls.data[item->idx].addr = data_pushint(data_push(expr->d.v.v.s.data, expr->d.v.v.s.len));
+				break;
+			default:
+				error("cannot generate code for unknown expression class");
+			}
+		} else if (item->kind == ITEM_ASSGN) {
+			struct expr *expr = &exprs.data[assgns.data[item->idx].val];
+			struct assgn *assgn = &assgns.data[item->idx];
+			struct decl *decl = finddecl(block, assgn->s);
+			if (decl == NULL)
+				error("unknown name");
+
+			if (buf && decl->addr == 0)
+				error("assignment before declaration");
+
+			switch (expr->class) {
+			case C_INT:
+				// this is sort of an optimization, since we write at compile-time instead of evaluating and storing. should this happen here in the long term?
+				enum reg reg = getreg();
+				total += genexpr(buf ? buf + total : NULL, assgn->val, reg);
+				total += mov_m64_r64(buf ? buf + total : NULL, decl->addr, reg);
+				freereg(reg);
+				break;
+			// FIXME: we assume that any string is a literal, may break if we add binary operands on strings in the future.
+			case C_STR:
+				size_t addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
+				total += mov_r_imm(buf ? buf + total : NULL, reg, addr);
+				total += mov_m64_r64(buf ? buf + total : NULL, decl->addr, reg);
 				break;
 			default:
 				error("cannot generate code for unknown expression class");

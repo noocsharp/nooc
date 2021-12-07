@@ -55,6 +55,17 @@ enum type {
 	TYPE_STR
 };
 
+struct assgn {
+	struct slice s;
+	size_t val; // struct exprs
+};
+
+struct assgns {
+	size_t cap;
+	size_t len;
+	struct assgn *data;
+};
+
 struct decl {
 	struct slice s;
 	enum type type;
@@ -77,7 +88,8 @@ struct data {
 struct item {
 	enum {
 		ITEM_DECL,
-		ITEM_EXPR
+		ITEM_ASSGN,
+		ITEM_EXPR,
 	} kind;
 	size_t idx;
 };
