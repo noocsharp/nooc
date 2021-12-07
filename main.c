@@ -41,6 +41,18 @@ lex(struct slice start)
 
 	struct token *cur = head;
 	while (start.len) {
+		if (isblank(*start.data)) {
+			ADVANCE(1);
+			continue;
+		}
+
+		if (*start.data == '\n') {
+			ADVANCE(1);
+			line += 1;
+			col = 1;
+			continue;
+		}
+
 		if (slice_cmplit(&start, "if") == 0) {
 			cur->type = TOK_IF;
 			ADVANCE(2);
@@ -53,9 +65,6 @@ lex(struct slice start)
 		} else if (slice_cmplit(&start, "loop") == 0) {
 			cur->type = TOK_LOOP;
 			ADVANCE(4);
-		} else if (isblank(*start.data)) {
-			ADVANCE(1);
-			continue;
 		} else if (*start.data == '>') {
 			cur->type = TOK_GREATER;
 			ADVANCE(1);
@@ -93,11 +102,6 @@ lex(struct slice start)
 			}
 
 			ADVANCE(1);
-		} else if (*start.data == '\n') {
-			ADVANCE(1);
-			line += 1;
-			col = 1;
-			continue;
 		} else if (*start.data == '+') {
 			cur->type = TOK_PLUS;
 			ADVANCE(1);
