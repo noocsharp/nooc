@@ -21,13 +21,20 @@ struct decls decls;
 struct assgns assgns;
 struct exprs exprs;
 
+char *infile;
+
 #define ADVANCE(n) \
+			cur->line = line ; \
+			cur->col = line ; \
 			start.data += (n) ; \
-			start.len -= (n) ;
+			start.len -= (n) ; \
+			col += (n) ;
 
 struct token *
 lex(struct slice start)
 {
+	size_t line = 1;
+	size_t col = 1;
 	struct token *head = calloc(1, sizeof(struct token));
 	if (!head)
 		return NULL;
@@ -88,6 +95,8 @@ lex(struct slice start)
 			ADVANCE(1);
 		} else if (*start.data == '\n') {
 			ADVANCE(1);
+			line += 1;
+			col = 1;
 			continue;
 		} else if (*start.data == '+') {
 			cur->type = TOK_PLUS;
@@ -108,7 +117,7 @@ lex(struct slice start)
 				cur->slice.len++;
 			}
 		} else {
-			error("invalid token");
+			error("invalid token", line, col);
 		}
 
 		cur->next = calloc(1, sizeof(struct token));
@@ -119,6 +128,9 @@ lex(struct slice start)
 
 		cur = cur->next;
 	}
+
+	cur->line = line;
+	cur->col = col;
 
 	return head;
 }
@@ -131,9 +143,9 @@ void
 expect(struct token *tok, enum tokentype type)
 {
 	if (!tok)
-		error("unexpected null token!");
+		error("unexpected null token!", tok->line, tok->col);
 	if (tok->type != type) {
-		error("mismatch");
+		error("mismatch", tok->line, tok->col);
 	}
 }
 
@@ -181,7 +193,7 @@ char *exprkind_str(enum exprkind kind)
 	case EXPR_COND:
 		return "EXPR_COND";
 	default:
-		error("invalid exprkind");
+		die("invalid exprkind");
 	}
 }
 
@@ -214,7 +226,7 @@ dumpbinop(enum binop op)
 		fprintf(stderr, "OP_GREATER");
 		break;
 	default:
-		error("invalid binop");
+		die("invalid binop");
 	}
 }
 
@@ -245,7 +257,7 @@ dumpexpr(int indent, struct expr *expr)
 		fprintf(stderr, "%.*s\n", (int)expr->d.call.name.len, expr->d.call.name.data);
 		break;
 	default:
-		error("dumpexpr: bad expression");
+		die("dumpexpr: bad expression");
 	}
 }
 
@@ -257,13 +269,15 @@ parseexpr(struct token **tok)
 	struct expr expr = { 0 };
 	switch ((*tok)->type) {
 	case TOK_LOOP:
-		*tok = (*tok)->next;
+		expr.start = *tok;
 		expr.kind = EXPR_LOOP;
+		*tok = (*tok)->next;
 		expr.d.loop.block = parse(tok);
 		break;
 	case TOK_IF:
-		*tok = (*tok)->next;
+		expr.start = *tok;
 		expr.kind = EXPR_COND;
+		*tok = (*tok)->next;
 		expr.d.cond.cond = parseexpr(tok);
 		expr.d.cond.bif = parse(tok);
 		if ((*tok)->type == TOK_ELSE) {
@@ -283,6 +297,7 @@ parseexpr(struct token **tok)
 		if ((*tok)->next && (*tok)->next->type == TOK_LPAREN) {
 			size_t pidx;
 			expr.d.call.name = (*tok)->slice;
+			expr.start = *tok;
 			*tok = (*tok)->next->next;
 			expr.kind = EXPR_FCALL;
 
@@ -297,6 +312,7 @@ parseexpr(struct token **tok)
 			expect(*tok, TOK_RPAREN);
 		// an ident
 		} else {
+			expr.start = *tok;
 			expr.kind = EXPR_IDENT;
 			expr.d.s = (*tok)->slice;
 		}
@@ -321,14 +337,16 @@ parseexpr(struct token **tok)
 		expr.kind = EXPR_BINARY;
 		expr.d.op = OP_MINUS;
 binary_common:
+		expr.start = *tok;
 		*tok = (*tok)->next;
 		expr.left = parseexpr(tok);
 		expr.right = parseexpr(tok);
 		if (exprs.data[expr.left].class != exprs.data[expr.right].class)
-			error("expected binary expression operands to be of same class");
+			error("expected binary expression operands to be of same class", (*tok)->line, (*tok)->col);
 		expr.class = exprs.data[expr.left].class;
 		break;
 	case TOK_STRING:
+		expr.start = *tok;
 		expr.kind = EXPR_LIT;
 		expr.class = C_STR;
 		expr.d.v.v.s = (struct slice){ 0 };
@@ -348,10 +366,10 @@ binary_common:
 						array_add((&expr.d.v.v.s), c);
 						break;
 					default:
-						error("invalid string escape!");
+						error("invalid string escape!", (*tok)->line, (*tok)->col);
 					}
 				} else {
-					error("string escape without parameter");
+					error("string escape without parameter", (*tok)->line, (*tok)->col);
 				}
 				break;
 			default:
@@ -361,7 +379,7 @@ binary_common:
 		*tok = (*tok)->next;
 		break;
 	default:
-		error("invalid token for expression");
+		error("invalid token for expression", (*tok)->line, (*tok)->col);
 	}
 
 	array_add((&exprs), expr);
@@ -383,8 +401,10 @@ parse(struct token **tok)
 
 	while ((*tok)->type != TOK_NONE && (*tok)->type != TOK_RCURLY) {
 		item = (struct item){ 0 };
+		item.start = *tok;
 		if ((*tok)->type == TOK_LET) {
 			struct decl decl = { 0 };
+			decl.start = *tok;
 			item.kind = ITEM_DECL;
 			*tok = (*tok)->next;
 
@@ -398,7 +418,7 @@ parse(struct token **tok)
 			} else if (strncmp((*tok)->slice.data, "str", 3) == 0) {
 				decl.type = TYPE_STR;
 			} else {
-				error("unknown type");
+				error("unknown type", (*tok)->line, (*tok)->col);
 			}
 
 			*tok = (*tok)->next;
@@ -407,7 +427,7 @@ parse(struct token **tok)
 
 			// FIXME: scoping
 			if (finddecl(&items, decl.s)) {
-				error("repeat declaration!");
+				error("repeat declaration!", (*tok)->line, (*tok)->col);
 			}
 
 			decl.val = parseexpr(tok);
@@ -416,7 +436,8 @@ parse(struct token **tok)
 			item.idx = decls.len - 1;
 			array_add((&items), item);
 		} else if ((*tok)->type == TOK_NAME && (*tok)->next && (*tok)->next->type == TOK_EQUAL) {
-			struct assgn assgn;
+			struct assgn assgn = { 0 };
+			assgn.start = *tok;
 			item.kind = ITEM_ASSGN;
 			assgn.s = (*tok)->slice;
 
@@ -445,50 +466,52 @@ void
 typecheck(struct block items)
 {
 	for (size_t i = 0; i < items.len; i++) {
+		struct item *item = &items.data[i];
 		struct expr *expr;
 		struct decl *decl;
 		switch (items.data[i].kind) {
 		case ITEM_DECL:
-			decl = &decls.data[items.data[i].idx];
+			decl = &decls.data[item->idx];
 			switch (decl->type) {
 			case TYPE_I64:
 				expr = &exprs.data[decl->val];
 				// FIXME: we should be able to deal with ident or fcalls
-				if (expr->class != C_INT) error("expected integer expression for integer declaration");
+				if (expr->class != C_INT)
+					error("expected integer expression for integer declaration", decl->start->line, decl->start->col);
 				break;
 			case TYPE_STR:
 				expr = &exprs.data[decl->val];
 				// FIXME: we should be able to deal with ident or fcalls
-				if (expr->class != C_STR) error("expected string expression for string declaration");
+				if (expr->class != C_STR) error("expected string expression for string declaration", decl->start->line, decl->start->col);
 				break;
 			default:
-				error("unknown decl type");
+				error("unknown decl type", decl->start->line, decl->start->col);
 			}
 			break;
 		case ITEM_ASSGN:
-			struct assgn *assgn = &assgns.data[items.data[i].idx];
+			struct assgn *assgn = &assgns.data[item->idx];
 			decl = finddecl(&items, assgn->s);
 			if (decl == NULL)
-				error("unknown name");
+				error("unknown name", assgn->start->line, assgn->start->col);
 			switch (decl->type) {
 			case TYPE_I64:
 				expr = &exprs.data[assgn->val];
 				// FIXME: we should be able to deal with ident or fcalls
-				if (expr->class != C_INT) error("expected integer expression for integer variable");
+				if (expr->class != C_INT) error("expected integer expression for integer variable", assgn->start->line, assgn->start->col);
 				break;
 			case TYPE_STR:
 				expr = &exprs.data[assgn->val];
 				// FIXME: we should be able to deal with ident or fcalls
-				if (expr->class != C_STR) error("expected string expression for string variable");
+				if (expr->class != C_STR) error("expected string expression for string variable", assgn->start->line, assgn->start->col);
 				break;
 			default:
-				error("unknown decl type");
+				error("unknown decl type", assgn->start->line, assgn->start->col);
 			}
 			break;
 		case ITEM_EXPR:
 			break;
 		default:
-			error("unknown item type");
+			error("unknown item type", item->start->line, item->start->col);
 		}
 	}
 }
@@ -510,7 +533,7 @@ genexpr(char *buf, size_t idx, enum reg reg)
 			break;
 		}
 		default:
-			error("genexpr: unknown value type!");
+			error("genexpr: unknown value type!", expr->start->line, expr->start->col);
 		}
 	} else if (expr->kind == EXPR_BINARY) {
 		len += genexpr(ptr ? ptr + len : ptr, expr->left, reg);
@@ -531,27 +554,28 @@ genexpr(char *buf, size_t idx, enum reg reg)
 			break;
 		}
 		default:
-			error("genexpr: unknown binary op!");
+			error("genexpr: unknown binary op!", expr->start->line, expr->start->col);
 		}
 		freereg(rreg);
 	} else if (expr->kind == EXPR_IDENT) {
 		struct decl *decl = finddecl(curitems, expr->d.s);
 		if (decl == NULL) {
-			error("unknown name!");
+			error("unknown name!", expr->start->line, expr->start->col);
 		}
 		len += mov_r64_m64(ptr ? ptr + len : ptr, reg, decl->addr);
 	} else {
-		error("genexpr: could not generate code for expression");
+		error("genexpr: could not generate code for expression", expr->start->line, expr->start->col);
 	}
 	return len;
 }
 
 size_t
-gensyscall(char *buf, struct fparams *params)
+gensyscall(char *buf, struct expr *expr)
 {
 	size_t len = 0;
+	struct fparams *params = &expr->d.call.params;
 	if (params->len > 7)
-		error("syscall can take at most 7 parameters");
+		error("syscall can take at most 7 parameters", expr->start->line, expr->start->col);
 
 	// encoding for argument registers in ABI order
 	for (int i = 0; i < params->len; i++) {
@@ -579,38 +603,38 @@ genblock(char *buf, struct block *block)
 	for (int i = 0; i < block->len; i++) {
 		struct item *item = &block->data[i];
 		if (item->kind == ITEM_EXPR) {
-			struct expr expr = exprs.data[item->idx];
+			struct expr *expr = &exprs.data[item->idx];
 			// FIXME: 7 should not be hardcoded here
-			if (expr.kind == EXPR_FCALL) {
-				if (slice_cmplit(&exprs.data[item->idx].d.call.name, "syscall") == 0) {
-					total += gensyscall(buf ? buf + total : NULL, &(exprs.data[item->idx].d.call.params));
+			if (expr->kind == EXPR_FCALL) {
+				if (slice_cmplit(&expr->d.call.name, "syscall") == 0) {
+					total += gensyscall(buf ? buf + total : NULL, expr);
 				} else {
-					error("unknown function!");
+					error("unknown function!", expr->start->line, expr->start->col);
 				}
-			} else if (expr.kind == EXPR_COND) {
-				struct expr *binary = &exprs.data[expr.d.cond.cond];
+			} else if (expr->kind == EXPR_COND) {
+				struct expr *binary = &exprs.data[expr->d.cond.cond];
 				// FIXME this should go away
 				assert(binary->kind == EXPR_BINARY);
 				enum reg reg = getreg();
-				total += genexpr(buf ? buf + total : NULL, expr.d.cond.cond, reg);
-				size_t iflen = genblock(NULL, &expr.d.cond.bif) + jmp(NULL, 0);
-				size_t elselen = genblock(NULL, &expr.d.cond.belse);
+				total += genexpr(buf ? buf + total : NULL, expr->d.cond.cond, reg);
+				size_t iflen = genblock(NULL, &expr->d.cond.bif) + jmp(NULL, 0);
+				size_t elselen = genblock(NULL, &expr->d.cond.belse);
 				switch (binary->d.op) {
 				case OP_GREATER:
 					total += jng(buf ? buf + total : NULL, iflen);
 					break;
 				default:
-					error("unknown binop for conditional");
+					error("unknown binop for conditional", expr->start->line, expr->start->col);
 				}
-				total += genblock(buf ? buf + total : NULL, &expr.d.cond.bif);
+				total += genblock(buf ? buf + total : NULL, &expr->d.cond.bif);
 				total += jmp(buf ? buf + total: NULL, elselen);
-				total += genblock(buf ? buf + total : NULL, &expr.d.cond.belse);
-			} else if (expr.kind == EXPR_LOOP) {
-				size_t back = genblock(NULL, &expr.d.loop.block) + jmp(NULL, 0);
-				total += genblock(buf ? buf + total : NULL, &expr.d.loop.block);
+				total += genblock(buf ? buf + total : NULL, &expr->d.cond.belse);
+			} else if (expr->kind == EXPR_LOOP) {
+				size_t back = genblock(NULL, &expr->d.loop.block) + jmp(NULL, 0);
+				total += genblock(buf ? buf + total : NULL, &expr->d.loop.block);
 				total += jmp(buf ? buf + total: NULL, -back);
 			} else {
-				error("unhandled toplevel expression type!");
+				error("unhandled toplevel expression type!", expr->start->line, expr->start->col);
 			}
 		} else if (item->kind == ITEM_DECL) {
 			struct expr *expr = &exprs.data[decls.data[item->idx].val];
@@ -635,17 +659,17 @@ genblock(char *buf, struct block *block)
 					decls.data[item->idx].addr = data_pushint(data_push(expr->d.v.v.s.data, expr->d.v.v.s.len));
 				break;
 			default:
-				error("cannot generate code for unknown expression class");
+				error("cannot generate code for unknown expression class", expr->start->line, expr->start->col);
 			}
 		} else if (item->kind == ITEM_ASSGN) {
 			struct expr *expr = &exprs.data[assgns.data[item->idx].val];
 			struct assgn *assgn = &assgns.data[item->idx];
 			struct decl *decl = finddecl(block, assgn->s);
 			if (decl == NULL)
-				error("unknown name");
+				error("unknown name", assgn->start->line, assgn->start->col);
 
 			if (buf && decl->addr == 0)
-				error("assignment before declaration");
+				error("assignment before declaration", assgn->start->line, assgn->start->col);
 
 			switch (expr->class) {
 			case C_INT:
@@ -662,10 +686,10 @@ genblock(char *buf, struct block *block)
 				total += mov_m64_r64(buf ? buf + total : NULL, decl->addr, reg);
 				break;
 			default:
-				error("cannot generate code for unknown expression class");
+				error("cannot generate code for unknown expression class", expr->start->line, expr->start->col);
 			}
 		} else {
-			error("cannot generate code for type");
+			error("cannot generate code for type", item->start->line, item->start->col);
 		}
 	}
 
@@ -682,7 +706,8 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	int in = open(argv[1], 0, O_RDONLY);
+	infile = argv[1];
+	int in = open(infile, 0, O_RDONLY);
 	if (in < 0) {
 		fprintf(stderr, "couldn't open input\n");
 		return 1;

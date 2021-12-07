@@ -26,7 +26,7 @@ getreg()
 		}
 	}
 
-	error("out of registers!");
+	die("out of registers!");
 }
 
 void
@@ -164,7 +164,7 @@ jng(char *buf, int64_t offset)
 		}
 		return 2;
 	} else {
-		error("unimplemented jng offet!");
+		die("unimplemented jng offet!");
 	}
 }
 
@@ -179,7 +179,7 @@ jg(char *buf, int64_t offset)
 		}
 		return 2;
 	} else {
-		error("unimplemented jg offet!");
+		die("unimplemented jg offet!");
 	}
 }
 
@@ -194,6 +194,6 @@ jmp(char *buf, int64_t offset)
 		}
 		return 2;
 	} else {
-		error("unimplemented jmp offet!");
+		die("unimplemented jmp offet!");
 	}
 }

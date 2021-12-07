@@ -34,6 +34,7 @@ struct slice {
 
 struct token {
 	enum tokentype type;
+	size_t line, col;
 	struct slice slice;
 	struct token *next;
 };
@@ -58,6 +59,7 @@ enum type {
 struct assgn {
 	struct slice s;
 	size_t val; // struct exprs
+	struct token *start;
 };
 
 struct assgns {
@@ -71,6 +73,7 @@ struct decl {
 	enum type type;
 	size_t val; // struct exprs
 	size_t addr;
+	struct token *start;
 };
 
 struct decls {
@@ -92,6 +95,7 @@ struct item {
 		ITEM_EXPR,
 	} kind;
 	size_t idx;
+	struct token *start;
 };
 
 struct block {
@@ -151,6 +155,7 @@ struct expr {
 	} d;
 	size_t left;
 	size_t right;
+	struct token *start;
 };
 
 struct exprs {

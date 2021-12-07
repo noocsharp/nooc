@@ -7,6 +7,8 @@
 #include "array.h"
 #include "util.h"
 
+extern char *infile;
+
 int
 slice_cmplit(struct slice *s1, char *s2)
 {
@@ -18,7 +20,14 @@ slice_cmplit(struct slice *s1, char *s2)
 }
 
 void
-error(char *error)
+error(char *error, size_t line, size_t col)
+{
+	fprintf(stderr, "%s:%u:%u: %s\n", infile, line, col, error);
+	exit(1);
+}
+
+void
+die(char *error)
 {
 	fprintf(stderr, "%s\n", error);
 	exit(1);
