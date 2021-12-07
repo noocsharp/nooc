@@ -696,6 +696,10 @@ main(int argc, char *argv[])
 
 	char *addr = mmap(NULL, statbuf.st_size, PROT_READ, MAP_PRIVATE, in, 0);
 	close(in);
+	if (addr == NULL) {
+		fprintf(stderr, "failed to map input file into memory\n");
+		return 1;
+	}
 
 	struct token *head = lex((struct slice){statbuf.st_size, statbuf.st_size, addr});
 	struct token *curtoken = head;
