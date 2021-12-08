@@ -24,8 +24,6 @@ struct exprs exprs;
 char *infile;
 
 #define ADVANCE(n) \
-			cur->line = line ; \
-			cur->col = line ; \
 			start.data += (n) ; \
 			start.len -= (n) ; \
 			col += (n) ;
@@ -52,6 +50,9 @@ lex(struct slice start)
 			col = 1;
 			continue;
 		}
+
+		cur->line = line;
+		cur->col = col;
 
 		if (slice_cmplit(&start, "if") == 0) {
 			cur->type = TOK_IF;
