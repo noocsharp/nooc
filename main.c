@@ -17,6 +17,7 @@
 #include "util.h"
 #include "elf.h"
 #include "lex.h"
+#include "parse.h"
 
 struct decls decls;
 struct assgns assgns;
@@ -25,16 +26,6 @@ struct exprs exprs;
 char *infile;
 
 struct data data_seg;
-
-void
-expect(struct token *tok, enum tokentype type)
-{
-	if (!tok)
-		error("unexpected null token!", tok->line, tok->col);
-	if (tok->type != type) {
-		error("mismatch", tok->line, tok->col);
-	}
-}
 
 uint64_t
 data_push(char *ptr, size_t len)
@@ -51,19 +42,6 @@ data_pushint(uint64_t i)
 }
 
 struct block *curitems;
-
-struct decl *
-finddecl(struct block *items, struct slice s)
-{
-	for (int i = 0; i < decls.len; i++) {
-		struct decl *decl = &(decls.data[i]);
-		if (slice_cmp(&s, &decl->s) == 0) {
-			return decl;
-		}
-	}
-
-	return NULL;
-}
 
 char *exprkind_str(enum exprkind kind)
 {
@@ -145,219 +123,6 @@ dumpexpr(int indent, struct expr *expr)
 	default:
 		die("dumpexpr: bad expression");
 	}
-}
-
-struct block parse(struct token **tok);
-
-size_t
-parseexpr(struct token **tok)
-{
-	struct expr expr = { 0 };
-	switch ((*tok)->type) {
-	case TOK_LOOP:
-		expr.start = *tok;
-		expr.kind = EXPR_LOOP;
-		*tok = (*tok)->next;
-		expr.d.loop.block = parse(tok);
-		break;
-	case TOK_IF:
-		expr.start = *tok;
-		expr.kind = EXPR_COND;
-		*tok = (*tok)->next;
-		expr.d.cond.cond = parseexpr(tok);
-		expr.d.cond.bif = parse(tok);
-		if ((*tok)->type == TOK_ELSE) {
-			*tok = (*tok)->next;
-			expr.d.cond.belse = parse(tok);
-		}
-		break;
-	case TOK_LPAREN:
-		*tok = (*tok)->next;
-		size_t ret = parseexpr(tok);
-		expect(*tok, TOK_RPAREN);
-		*tok = (*tok)->next;
-		return ret;
-		break;
-	case TOK_NAME:
-		expr.start = *tok;
-		// a procedure definition
-		if (slice_cmplit(&(*tok)->slice, "proc") == 0) {
-			expr.kind = EXPR_PROC;
-			expr.class = C_PROC;
-			*tok = (*tok)->next;
-			expr.d.proc.block = parse(tok);
-		// a function call
-		} else if ((*tok)->next && (*tok)->next->type == TOK_LPAREN) {
-			size_t pidx;
-			expr.d.call.name = (*tok)->slice;
-			*tok = (*tok)->next->next;
-			expr.kind = EXPR_FCALL;
-
-			while ((*tok)->type != TOK_RPAREN) {
-				pidx = parseexpr(tok);
-				array_add((&expr.d.call.params), pidx);
-				if ((*tok)->type == TOK_RPAREN)
-					break;
-				expect(*tok, TOK_COMMA);
-				*tok = (*tok)->next;
-			}
-			expect(*tok, TOK_RPAREN);
-			*tok = (*tok)->next;
-		// an ident
-		} else {
-			expr.kind = EXPR_IDENT;
-			expr.d.s = (*tok)->slice;
-			*tok = (*tok)->next;
-		}
-		break;
-	case TOK_NUM:
-		expr.kind = EXPR_LIT;
-		expr.class = C_INT;
-		// FIXME: error check
-		expr.d.v.v.i = strtol((*tok)->slice.data, NULL, 10);
-		*tok = (*tok)->next;
-		break;
-	case TOK_GREATER:
-		expr.kind = EXPR_BINARY;
-		expr.d.op = OP_GREATER;
-		goto binary_common;
-	case TOK_PLUS:
-		expr.kind = EXPR_BINARY;
-		expr.d.op = OP_PLUS;
-		goto binary_common;
-	case TOK_MINUS:
-		expr.kind = EXPR_BINARY;
-		expr.d.op = OP_MINUS;
-binary_common:
-		expr.start = *tok;
-		*tok = (*tok)->next;
-		expr.left = parseexpr(tok);
-		expr.right = parseexpr(tok);
-		if (exprs.data[expr.left].class != exprs.data[expr.right].class)
-			error("expected binary expression operands to be of same class", (*tok)->line, (*tok)->col);
-		expr.class = exprs.data[expr.left].class;
-		break;
-	case TOK_STRING:
-		expr.start = *tok;
-		expr.kind = EXPR_LIT;
-		expr.class = C_STR;
-		expr.d.v.v.s = (struct slice){ 0 };
-		struct slice str = (*tok)->slice;
-		for (size_t i = 0; i < str.len; i++) {
-			switch (str.data[i]) {
-			case '\\':
-				if (++i < str.len) {
-					char c;
-					switch (str.data[i]) {
-					case 'n':
-						c = '\n';
-						array_add((&expr.d.v.v.s), c);
-						break;
-					case '\\':
-						c = '\\';
-						array_add((&expr.d.v.v.s), c);
-						break;
-					default:
-						error("invalid string escape!", (*tok)->line, (*tok)->col);
-					}
-				} else {
-					error("string escape without parameter", (*tok)->line, (*tok)->col);
-				}
-				break;
-			default:
-				array_add((&expr.d.v.v.s), str.data[i]);
-			}
-		}
-		*tok = (*tok)->next;
-		break;
-	default:
-		error("invalid token for expression", (*tok)->line, (*tok)->col);
-	}
-
-	array_add((&exprs), expr);
-
-	return exprs.len - 1;
-}
-
-struct block
-parse(struct token **tok)
-{
-	struct block items = { 0 };
-	struct item item;
-	bool curlies = false;
-
-	if ((*tok)->type == TOK_LCURLY) {
-		curlies = true;
-		*tok = (*tok)->next;
-	}
-
-	while ((*tok)->type != TOK_NONE && (*tok)->type != TOK_RCURLY) {
-		item = (struct item){ 0 };
-		item.start = *tok;
-		if ((*tok)->type == TOK_LET) {
-			struct decl decl = { 0 };
-			decl.start = *tok;
-			item.kind = ITEM_DECL;
-			*tok = (*tok)->next;
-
-			expect(*tok, TOK_NAME);
-			decl.s = (*tok)->slice;
-			*tok = (*tok)->next;
-
-			expect(*tok, TOK_NAME);
-			if (strncmp((*tok)->slice.data, "i64", 3) == 0) {
-				decl.type = TYPE_I64;
-			} else if (strncmp((*tok)->slice.data, "str", 3) == 0) {
-				decl.type = TYPE_STR;
-			} else if (strncmp((*tok)->slice.data, "proc", 3) == 0) {
-				decl.type = TYPE_PROC;
-			} else {
-				error("unknown type", (*tok)->line, (*tok)->col);
-			}
-
-			*tok = (*tok)->next;
-			expect(*tok, TOK_EQUAL);
-			*tok = (*tok)->next;
-
-			// FIXME: scoping
-			if (finddecl(&items, decl.s)) {
-				error("repeat declaration!", (*tok)->line, (*tok)->col);
-			}
-
-			decl.val = parseexpr(tok);
-			array_add((&decls), decl);
-
-			item.idx = decls.len - 1;
-			array_add((&items), item);
-		} else if ((*tok)->type == TOK_RETURN) {
-			item.kind = ITEM_RETURN;
-			*tok = (*tok)->next;
-			array_add((&items), item);
-		} else if ((*tok)->type == TOK_NAME && (*tok)->next && (*tok)->next->type == TOK_EQUAL) {
-			struct assgn assgn = { 0 };
-			assgn.start = *tok;
-			item.kind = ITEM_ASSGN;
-			assgn.s = (*tok)->slice;
-
-			*tok = (*tok)->next->next;
-			assgn.val = parseexpr(tok);
-			array_add((&assgns), assgn);
-
-			item.idx = assgns.len - 1;
-			array_add((&items), item);
-		} else {
-			item.kind = ITEM_EXPR;
-			item.idx = parseexpr(tok);
-			array_add((&items), item);
-		}
-	}
-
-	if (curlies) {
-		expect(*tok, TOK_RCURLY);
-		*tok = (*tok)->next;
-	}
-
-	return items;
 }
 
 void
@@ -644,8 +409,7 @@ main(int argc, char *argv[])
 	}
 
 	struct token *head = lex((struct slice){statbuf.st_size, statbuf.st_size, addr});
-	struct token *curtoken = head;
-	struct block items = parse(&curtoken);
+	struct block items = parse(head);
 	typecheck(items);
 
 	size_t len = genblock(NULL, &items);
