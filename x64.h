@@ -41,3 +41,5 @@ size_t cmp_r64_r64(char *buf, enum reg reg1, enum reg reg2);
 size_t jng(char *buf, int64_t offset);
 size_t jg(char *buf, int64_t offset);
 size_t jmp(char *buf, int64_t offset);
+size_t call(char *buf, enum reg reg);
+size_t ret(char *buf);

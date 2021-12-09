@@ -1,0 +1,7 @@
+let hello proc = proc {
+	syscall(1, 1, "hello\n", 6)
+	return
+}
+
+hello()
+syscall(60, 0)

@@ -5,7 +5,7 @@
 #include "elf.h"
 
 int
-elf(char *text, size_t len, char* data, size_t dlen, FILE *f)
+elf(size_t entry, char *text, size_t len, char* data, size_t dlen, FILE *f)
 {
 	Elf64_Ehdr ehdr = { 0 };
 	Elf64_Phdr phdr_text = { 0 };
@@ -24,7 +24,7 @@ elf(char *text, size_t len, char* data, size_t dlen, FILE *f)
 	ehdr.e_machine = EM_X86_64;
 	ehdr.e_version = EV_CURRENT;
 
-	ehdr.e_entry = TEXT_OFFSET;
+	ehdr.e_entry = entry;
 	ehdr.e_phoff = sizeof(ehdr);
 	ehdr.e_phentsize = sizeof(phdr_text);
 	ehdr.e_phnum = 2;

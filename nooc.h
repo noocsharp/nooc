@@ -23,7 +23,8 @@ enum tokentype {
 	TOK_LET,
 	TOK_IF,
 	TOK_ELSE,
-	TOK_LOOP
+	TOK_LOOP,
+	TOK_RETURN
 };
 
 struct slice {
@@ -53,7 +54,8 @@ struct fcall {
 // FIXME: make a struct for more complex types
 enum type {
 	TYPE_I64,
-	TYPE_STR
+	TYPE_STR,
+	TYPE_PROC,
 };
 
 struct assgn {
@@ -93,6 +95,7 @@ struct item {
 		ITEM_DECL,
 		ITEM_ASSGN,
 		ITEM_EXPR,
+		ITEM_RETURN,
 	} kind;
 	size_t idx;
 	struct token *start;
@@ -114,6 +117,9 @@ struct loop {
 	struct block block;
 };
 
+struct proc {
+	struct block block;
+};
 
 enum binop {
 	OP_PLUS,
@@ -134,12 +140,14 @@ enum exprkind {
 	EXPR_BINARY,
 	EXPR_FCALL,
 	EXPR_COND,
-	EXPR_LOOP
+	EXPR_LOOP,
+	EXPR_PROC,
 };
 
 enum class {
 	C_INT,
 	C_STR,
+	C_PROC,
 };
 
 struct expr {
@@ -152,6 +160,7 @@ struct expr {
 		struct fcall call;
 		struct cond cond;
 		struct loop loop;
+		struct proc proc;
 	} d;
 	size_t left;
 	size_t right;

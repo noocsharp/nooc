@@ -197,3 +197,24 @@ jmp(char *buf, int64_t offset)
 		die("unimplemented jmp offet!");
 	}
 }
+
+size_t
+call(char *buf, enum reg reg)
+{
+	if (buf) {
+		*(buf++) = 0xFF;
+		*(buf++) = (MOD_DIRECT << 6) | (2 << 3) | reg;
+	}
+
+	return 2;
+}
+
+size_t
+ret(char *buf)
+{
+	if (buf) {
+		*(buf++) = 0xC3;
+	}
+
+	return 1;
+}
