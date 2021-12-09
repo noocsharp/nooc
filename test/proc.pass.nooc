@@ -3,5 +3,7 @@ let hello proc = proc {
 	return
 }
 
-hello()
-syscall(60, 0)
+let main proc = proc {
+	hello()
+	syscall(60, 0)
+}

@@ -10,6 +10,15 @@
 extern char *infile;
 
 int
+slice_cmp(struct slice *s1, struct slice *s2)
+{
+	if (s1->len != s2->len)
+		return 1;
+
+	return memcmp(s1->data, s2->data, s1->len);
+}
+
+int
 slice_cmplit(struct slice *s1, char *s2)
 {
 	size_t len = strlen(s2);

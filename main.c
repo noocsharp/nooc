@@ -178,8 +178,7 @@ finddecl(struct block *items, struct slice s)
 {
 	for (int i = 0; i < decls.len; i++) {
 		struct decl *decl = &(decls.data[i]);
-		size_t len = s.len < decl->s.len ? s.len : decl->s.len;
-		if (memcmp(s.data, decl->s.data, len) == 0) {
+		if (slice_cmp(&s, &decl->s) == 0) {
 			return decl;
 		}
 	}
@@ -621,16 +620,12 @@ gensyscall(char *buf, struct expr *expr)
 
 // FIXME: It is not ideal to calculate length by doing all the calculations to generate instruction, before we actually write the instructions.
 size_t
-genblock(char *buf, struct block *block, size_t *entry)
+genblock(char *buf, struct block *block)
 {
 	size_t total = 0;
-	bool foundexpr = false;
 	for (int i = 0; i < block->len; i++) {
 		struct item *item = &block->data[i];
 		if (item->kind == ITEM_EXPR) {
-			if (entry && !foundexpr)
-				*entry = total;
-			foundexpr = true;
 			struct expr *expr = &exprs.data[item->idx];
 			// FIXME: 7 should not be hardcoded here
 			if (expr->kind == EXPR_FCALL) {
@@ -654,8 +649,8 @@ genblock(char *buf, struct block *block, size_t *entry)
 				assert(binary->kind == EXPR_BINARY);
 				enum reg reg = getreg();
 				total += genexpr(buf ? buf + total : NULL, expr->d.cond.cond, reg);
-				size_t iflen = genblock(NULL, &expr->d.cond.bif, NULL) + jmp(NULL, 0);
-				size_t elselen = genblock(NULL, &expr->d.cond.belse, NULL);
+				size_t iflen = genblock(NULL, &expr->d.cond.bif) + jmp(NULL, 0);
+				size_t elselen = genblock(NULL, &expr->d.cond.belse);
 				switch (binary->d.op) {
 				case OP_GREATER:
 					total += jng(buf ? buf + total : NULL, iflen);
@@ -663,12 +658,12 @@ genblock(char *buf, struct block *block, size_t *entry)
 				default:
 					error("unknown binop for conditional", expr->start->line, expr->start->col);
 				}
-				total += genblock(buf ? buf + total : NULL, &expr->d.cond.bif, NULL);
+				total += genblock(buf ? buf + total : NULL, &expr->d.cond.bif);
 				total += jmp(buf ? buf + total: NULL, elselen);
-				total += genblock(buf ? buf + total : NULL, &expr->d.cond.belse, NULL);
+				total += genblock(buf ? buf + total : NULL, &expr->d.cond.belse);
 			} else if (expr->kind == EXPR_LOOP) {
-				size_t back = genblock(NULL, &expr->d.loop.block, NULL) + jmp(NULL, 0);
-				total += genblock(buf ? buf + total : NULL, &expr->d.loop.block, NULL);
+				size_t back = genblock(NULL, &expr->d.loop.block) + jmp(NULL, 0);
+				total += genblock(buf ? buf + total : NULL, &expr->d.loop.block);
 				total += jmp(buf ? buf + total: NULL, -back);
 			} else {
 				error("unhandled toplevel expression type!", expr->start->line, expr->start->col);
@@ -697,7 +692,7 @@ genblock(char *buf, struct block *block, size_t *entry)
 				break;
 			case C_PROC:
 				decls.data[item->idx].addr = total + TEXT_OFFSET;
-				total += genblock(buf ? buf + total : NULL, &(expr->d.proc.block), NULL);
+				total += genblock(buf ? buf + total : NULL, &(expr->d.proc.block));
 				break;
 			default:
 				error("cannot generate code for unknown expression class", expr->start->line, expr->start->col);
@@ -774,15 +769,14 @@ main(int argc, char *argv[])
 	struct block items = parse(&curtoken);
 	typecheck(items);
 
-	size_t len = genblock(NULL, &items, NULL);
+	size_t len = genblock(NULL, &items);
 	char *text = malloc(len);
 	if (!text) {
 		fprintf(stderr, "text allocation failed!");
 		return 1;
 	}
 
-	size_t entry;
-	size_t len2 = genblock(text, &items, &entry);
+	size_t len2 = genblock(text, &items);
 	assert(len == len2);
 
 	FILE *out = fopen(argv[2], "w");
@@ -792,9 +786,14 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
+	struct decl *main = finddecl(&items, (struct slice){4, 4, "main"});
+	if (main == NULL) {
+		fprintf(stderr, "main function not found\n");
+		return 1;
+	}
 	munmap(addr, statbuf.st_size);
 
-	elf(TEXT_OFFSET + entry, text, len, data_seg.data, data_seg.len, out);
+	elf(main->addr, text, len, data_seg.data, data_seg.len, out);
 
 	fclose(out);
 }
