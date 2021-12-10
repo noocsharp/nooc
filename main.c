@@ -19,6 +19,27 @@
 #include "lex.h"
 #include "parse.h"
 
+const char const *tokenstr[] = {
+	[TOK_NONE] = "TOK_NONE",
+	[TOK_NAME] = "TOK_NAME",
+	[TOK_LPAREN] = "TOK_LPAREN",
+	[TOK_RPAREN] = "TOK_RPAREN",
+	[TOK_LCURLY] = "TOK_LCURLY",
+	[TOK_RCURLY] = "TOK_RCURLY",
+	[TOK_PLUS] = "TOK_PLUS",
+	[TOK_MINUS] = "TOK_MINUS",
+	[TOK_GREATER] = "TOK_GREATER",
+	[TOK_COMMA] = "TOK_COMMA",
+	[TOK_EQUAL] = "TOK_EQUAL",
+	[TOK_NUM] = "TOK_NUM",
+	[TOK_STRING] = "TOK_STRING",
+	[TOK_LET] = "TOK_LET",
+	[TOK_IF] = "TOK_IF",
+	[TOK_ELSE] = "TOK_ELSE",
+	[TOK_LOOP] = "TOK_LOOP",
+	[TOK_RETURN] = "TOK_RETURN",
+};
+
 struct decls decls;
 struct assgns assgns;
 struct exprs exprs;

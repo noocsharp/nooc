@@ -9,6 +9,8 @@
 #include "util.h"
 #include "array.h"
 
+extern const char const *tokenstr[];
+
 extern struct decls decls;
 extern struct assgns assgns;
 extern struct exprs exprs;
@@ -34,7 +36,7 @@ expect(enum tokentype type)
 	if (!tok)
 		error(tok->line, tok->col, "unexpected null token!");
 	if (tok->type != type) {
-		error(tok->line, tok->col, "mismatch");
+		error(tok->line, tok->col, "expected %s but got %s", tokenstr[type], tokenstr[tok->type]);
 	}
 }
 
