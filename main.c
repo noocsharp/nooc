@@ -140,45 +140,49 @@ typecheck(struct block items)
 				expr = &exprs.data[decl->val];
 				// FIXME: we should be able to deal with ident or fcalls
 				if (expr->class != C_INT)
-					error("expected integer expression for integer declaration", decl->start->line, decl->start->col);
+					error(decl->start->line, decl->start->col, "expected integer expression for integer declaration");
 				break;
 			case TYPE_STR:
 				expr = &exprs.data[decl->val];
 				// FIXME: we should be able to deal with ident or fcalls
-				if (expr->class != C_STR) error("expected string expression for string declaration", decl->start->line, decl->start->col);
+				if (expr->class != C_STR)
+					error(decl->start->line, decl->start->col, "expected string expression for string declaration");
 				break;
 			case TYPE_PROC:
 				expr = &exprs.data[decl->val];
-				if (expr->class != C_PROC) error("expected proc expression for proc declaration", decl->start->line, decl->start->col);
+				if (expr->class != C_PROC)
+					error(decl->start->line, decl->start->col, "expected proc expression for proc declaration");
 				break;
 			default:
-				error("unknown decl type", decl->start->line, decl->start->col);
+				error(decl->start->line, decl->start->col, "unknown decl type");
 			}
 			break;
 		case ITEM_ASSGN:
 			struct assgn *assgn = &assgns.data[item->idx];
 			decl = finddecl(&items, assgn->s);
 			if (decl == NULL)
-				error("unknown name", assgn->start->line, assgn->start->col);
+				error(assgn->start->line, assgn->start->col, "unknown name");
 			switch (decl->type) {
 			case TYPE_I64:
 				expr = &exprs.data[assgn->val];
 				// FIXME: we should be able to deal with ident or fcalls
-				if (expr->class != C_INT) error("expected integer expression for integer variable", assgn->start->line, assgn->start->col);
+				if (expr->class != C_INT)
+					error(assgn->start->line, assgn->start->col, "expected integer expression for integer variable");
 				break;
 			case TYPE_STR:
 				expr = &exprs.data[assgn->val];
 				// FIXME: we should be able to deal with ident or fcalls
-				if (expr->class != C_STR) error("expected string expression for string variable", assgn->start->line, assgn->start->col);
+				if (expr->class != C_STR)
+					error(assgn->start->line, assgn->start->col, "expected string expression for string variable");
 				break;
 			default:
-				error("unknown decl type", assgn->start->line, assgn->start->col);
+				error(assgn->start->line, assgn->start->col, "unknown decl type");
 			}
 			break;
 		case ITEM_EXPR:
 			break;
 		default:
-			error("unknown item type", item->start->line, item->start->col);
+			error(item->start->line, item->start->col, "unknown item type");
 		}
 	}
 }
@@ -200,7 +204,7 @@ genexpr(char *buf, size_t idx, enum reg reg)
 			break;
 		}
 		default:
-			error("genexpr: unknown value type!", expr->start->line, expr->start->col);
+			error(expr->start->line, expr->start->col, "genexpr: unknown value type!");
 		}
 	} else if (expr->kind == EXPR_BINARY) {
 		len += genexpr(ptr ? ptr + len : ptr, expr->left, reg);
@@ -221,17 +225,17 @@ genexpr(char *buf, size_t idx, enum reg reg)
 			break;
 		}
 		default:
-			error("genexpr: unknown binary op!", expr->start->line, expr->start->col);
+			error(expr->start->line, expr->start->col, "genexpr: unknown binary op!");
 		}
 		freereg(rreg);
 	} else if (expr->kind == EXPR_IDENT) {
 		struct decl *decl = finddecl(curitems, expr->d.s);
 		if (decl == NULL) {
-			error("unknown name!", expr->start->line, expr->start->col);
+			error(expr->start->line, expr->start->col, "unknown name!");
 		}
 		len += mov_r64_m64(ptr ? ptr + len : ptr, reg, decl->addr);
 	} else {
-		error("genexpr: could not generate code for expression", expr->start->line, expr->start->col);
+		error(expr->start->line, expr->start->col, "genexpr: could not generate code for expression");
 	}
 	return len;
 }
@@ -242,7 +246,7 @@ gensyscall(char *buf, struct expr *expr)
 	size_t len = 0;
 	struct fparams *params = &expr->d.call.params;
 	if (params->len > 7)
-		error("syscall can take at most 7 parameters", expr->start->line, expr->start->col);
+		error(expr->start->line, expr->start->col, "syscall can take at most 7 parameters");
 
 	// encoding for argument registers in ABI order
 	for (int i = 0; i < params->len; i++) {
@@ -278,7 +282,7 @@ genblock(char *buf, struct block *block)
 				} else {
 					struct decl *decl = finddecl(block, expr->d.call.name);
 					if (decl == NULL) {
-						error("unknown function!", expr->start->line, expr->start->col);
+						error(expr->start->line, expr->start->col, "unknown function!");
 					}
 
 					enum reg reg = getreg();
@@ -300,7 +304,7 @@ genblock(char *buf, struct block *block)
 					total += jng(buf ? buf + total : NULL, iflen);
 					break;
 				default:
-					error("unknown binop for conditional", expr->start->line, expr->start->col);
+					error(expr->start->line, expr->start->col, "unknown binop for conditional");
 				}
 				total += genblock(buf ? buf + total : NULL, &expr->d.cond.bif);
 				total += jmp(buf ? buf + total: NULL, elselen);
@@ -310,7 +314,7 @@ genblock(char *buf, struct block *block)
 				total += genblock(buf ? buf + total : NULL, &expr->d.loop.block);
 				total += jmp(buf ? buf + total: NULL, -back);
 			} else {
-				error("unhandled toplevel expression type!", expr->start->line, expr->start->col);
+				error(expr->start->line, expr->start->col, "unhandled toplevel expression type!");
 			}
 		} else if (item->kind == ITEM_DECL) {
 			struct expr *expr = &exprs.data[decls.data[item->idx].val];
@@ -339,17 +343,17 @@ genblock(char *buf, struct block *block)
 				total += genblock(buf ? buf + total : NULL, &(expr->d.proc.block));
 				break;
 			default:
-				error("cannot generate code for unknown expression class", expr->start->line, expr->start->col);
+				error(expr->start->line, expr->start->col, "cannot generate code for unknown expression class");
 			}
 		} else if (item->kind == ITEM_ASSGN) {
 			struct expr *expr = &exprs.data[assgns.data[item->idx].val];
 			struct assgn *assgn = &assgns.data[item->idx];
 			struct decl *decl = finddecl(block, assgn->s);
 			if (decl == NULL)
-				error("unknown name", assgn->start->line, assgn->start->col);
+				error(assgn->start->line, assgn->start->col, "unknown name");
 
 			if (buf && decl->addr == 0)
-				error("assignment before declaration", assgn->start->line, assgn->start->col);
+				error(assgn->start->line, assgn->start->col, "assignment before declaration");
 
 			switch (expr->class) {
 			case C_INT:
@@ -366,12 +370,12 @@ genblock(char *buf, struct block *block)
 				total += mov_m64_r64(buf ? buf + total : NULL, decl->addr, reg);
 				break;
 			default:
-				error("cannot generate code for unknown expression class", expr->start->line, expr->start->col);
+				error(expr->start->line, expr->start->col, "cannot generate code for unknown expression class");
 			}
 		} else if (item->kind == ITEM_RETURN) {
 			total += ret(buf ? buf + total : NULL);
 		} else {
-			error("cannot generate code for type", item->start->line, item->start->col);
+			error(item->start->line, item->start->col, "cannot generate code for type");
 		}
 	}
 

@@ -108,7 +108,7 @@ lex(struct slice start)
 				cur->slice.len++;
 			}
 		} else {
-			error("invalid token", line, col);
+			error(line, col, "invalid token");
 		}
 
 		cur->next = calloc(1, sizeof(struct token));

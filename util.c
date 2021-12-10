@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -29,9 +30,15 @@ slice_cmplit(struct slice *s1, char *s2)
 }
 
 void
-error(char *error, size_t line, size_t col)
+error(size_t line, size_t col, const char *error, ...)
 {
-	fprintf(stderr, "%s:%u:%u: %s\n", infile, line, col, error);
+	va_list args;
+
+	fprintf(stderr, "%s:%u:%u: ", infile, line, col);
+	va_start(args, error);
+	vfprintf(stderr, error, args);
+	va_end(args);
+	fputc('\n', stderr);
 	exit(1);
 }
 

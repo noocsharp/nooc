@@ -32,9 +32,9 @@ static void
 expect(enum tokentype type)
 {
 	if (!tok)
-		error("unexpected null token!", tok->line, tok->col);
+		error(tok->line, tok->col, "unexpected null token!");
 	if (tok->type != type) {
-		error("mismatch", tok->line, tok->col);
+		error(tok->line, tok->col, "mismatch");
 	}
 }
 
@@ -62,10 +62,10 @@ parsestring()
 					array_add((&expr.d.v.v.s), c);
 					break;
 				default:
-					error("invalid string escape!", tok->line, tok->col);
+					error(tok->line, tok->col, "invalid string escape!");
 				}
 			} else {
-				error("string escape without parameter", tok->line, tok->col);
+				error(tok->line, tok->col, "string escape without parameter");
 			}
 			break;
 		default:
@@ -162,14 +162,14 @@ binary_common:
 		expr.left = parseexpr();
 		expr.right = parseexpr();
 		if (exprs.data[expr.left].class != exprs.data[expr.right].class)
-			error("expected binary expression operands to be of same class", tok->line, tok->col);
+			error(tok->line, tok->col, "expected binary expression operands to be of same class");
 		expr.class = exprs.data[expr.left].class;
 		break;
 	case TOK_STRING:
 		parsestring();
 		break;
 	default:
-		error("invalid token for expression", tok->line, tok->col);
+		error(tok->line, tok->col, "invalid token for expression");
 	}
 
 	array_add((&exprs), expr);
@@ -210,7 +210,7 @@ parseblock()
 			} else if (strncmp(tok->slice.data, "proc", 3) == 0) {
 				decl.type = TYPE_PROC;
 			} else {
-				error("unknown type", tok->line, tok->col);
+				error(tok->line, tok->col, "unknown type");
 			}
 
 			tok = tok->next;
@@ -219,7 +219,7 @@ parseblock()
 
 			// FIXME: scoping
 			if (finddecl(&items, decl.s)) {
-				error("repeat declaration!", tok->line, tok->col);
+				error(tok->line, tok->col, "repeat declaration!");
 			}
 
 			decl.val = parseexpr();
