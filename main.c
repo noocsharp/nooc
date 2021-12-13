@@ -182,6 +182,9 @@ typecheck(struct block items)
 				expr = &exprs.data[decl->val];
 				if (expr->class != C_PROC)
 					error(decl->start->line, decl->start->col, "expected proc expression for proc declaration");
+
+				if (expr->d.proc.params.len != type->d.typelist.len)
+					error(decl->start->line, decl->start->col, "procedure expression takes %u parameters, but declaration has type which takes %u", expr->d.proc.params.len, type->d.typelist.len);
 				break;
 			default:
 				error(decl->start->line, decl->start->col, "unknown decl type");
