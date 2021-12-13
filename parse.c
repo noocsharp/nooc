@@ -11,7 +11,7 @@
 #include "type.h"
 #include "map.h"
 
-extern const char const *tokenstr[];
+extern const char *const tokenstr[];
 
 extern struct decls decls;
 extern struct assgns assgns;
@@ -203,10 +203,8 @@ binary_common:
 static size_t
 parsetype()
 {
-	uint8_t hash[16];
 	struct type type = { 0 };
 	struct mapkey key;
-	size_t offset;
 	union mapval val;
 
 	if (strncmp(tok->slice.data, "proc", 3) == 0) {

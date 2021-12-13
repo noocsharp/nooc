@@ -22,7 +22,7 @@
 #include "map.h"
 #include "blockstack.c"
 
-const char const *tokenstr[] = {
+const char *const tokenstr[] = {
 	[TOK_NONE] = "TOK_NONE",
 	[TOK_NAME] = "TOK_NAME",
 	[TOK_LPAREN] = "TOK_LPAREN",
@@ -85,6 +85,8 @@ char *exprkind_str(enum exprkind kind)
 	default:
 		die("invalid exprkind");
 	}
+
+	return NULL;
 }
 
 struct exprs exprs;
@@ -98,6 +100,9 @@ dumpval(struct expr *e)
 		break;
 	case C_STR:
 		fprintf(stderr, "\"%.*s\"", (int)e->d.v.v.s.len, e->d.v.v.s.data);
+		break;
+	case C_PROC:
+		fprintf(stderr, "proc with %lu params", e->d.proc.params.len);
 		break;
 	}
 }

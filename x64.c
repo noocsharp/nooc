@@ -27,6 +27,7 @@ getreg()
 	}
 
 	die("out of registers!");
+	return 0; // prevents warning
 }
 
 void
@@ -195,6 +196,8 @@ jng(char *buf, int64_t offset)
 	} else {
 		die("unimplemented jng offet!");
 	}
+
+	return 0; // prevents warning
 }
 
 size_t
@@ -210,6 +213,8 @@ jg(char *buf, int64_t offset)
 	} else {
 		die("unimplemented jg offet!");
 	}
+
+	return 0; // prevents warning
 }
 
 size_t
@@ -225,6 +230,8 @@ jmp(char *buf, int64_t offset)
 	} else {
 		die("unimplemented jmp offet!");
 	}
+
+	return 0; // prevents warning
 }
 
 size_t

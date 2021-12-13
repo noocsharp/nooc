@@ -34,7 +34,7 @@ error(size_t line, size_t col, const char *error, ...)
 {
 	va_list args;
 
-	fprintf(stderr, "%s:%u:%u: ", infile, line, col);
+	fprintf(stderr, "%s:%lu:%lu: ", infile, line, col);
 	va_start(args, error);
 	vfprintf(stderr, error, args);
 	va_end(args);

@@ -4,7 +4,7 @@
 #include "nooc.h"
 #include "elf.h"
 
-int
+void
 elf(size_t entry, char *text, size_t len, char* data, size_t dlen, FILE *f)
 {
 	Elf64_Ehdr ehdr = { 0 };

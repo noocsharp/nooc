@@ -36,7 +36,6 @@ inittypes()
 	table.vals = xcalloc(2, sizeof(*table.vals));
 	struct type type = { 0 };
 	struct mapkey key = { 0 };
-	uint8_t out[16];
 
 	// first one should be 0
 	type_put(&type);
@@ -55,7 +54,7 @@ inittypes()
 }
 
 static void
-hashtype(struct type *type, char *out)
+hashtype(struct type *type, uint8_t *out)
 {
 	struct blake3 b3;
 
@@ -65,6 +64,7 @@ hashtype(struct type *type, char *out)
 	switch (type->class) {
 	case TYPE_PROC:
 		blake3_update(&b3, type->d.typelist.data, type->d.typelist.len * sizeof(*type->d.typelist.data));
+	default:
 	}
 
 	blake3_out(&b3, out, 16);
@@ -133,21 +133,3 @@ type_put(struct type *type)
 
 	return types.len - 1;
 }
-
-/*
-int
-main()
-{
-	struct type i64 = { .class = TYPE_I64 };
-	struct type str = { .class = TYPE_STR };
-	struct type proc = { .class = TYPE_PROC };
-	uint8_t i64hash[16], strhash[16], prochash[16];
-
-	hashtype(&i64, i64hash);
-	hashtype(&str, strhash);
-	hashtype(&proc, prochash);
-	printf("%x%x\n", *(uint64_t*)i64hash);
-	printf("%x%x\n", *(uint64_t*)strhash);
-	printf("%x%x\n", *(uint64_t*)prochash);
-}
-*/
