@@ -8,14 +8,20 @@
 #include "parse.h"
 #include "util.h"
 #include "array.h"
+#include "type.h"
+#include "map.h"
 
 extern const char const *tokenstr[];
 
 extern struct decls decls;
 extern struct assgns assgns;
 extern struct exprs exprs;
+extern struct types types;
+extern struct map *typesmap;
 
 struct token *tok;
+
+static void parsenametypes(struct nametypes *nametypes);
 
 struct decl *
 finddecl(struct block *items, struct slice s)
@@ -24,6 +30,20 @@ finddecl(struct block *items, struct slice s)
 		struct decl *decl = &(decls.data[i]);
 		if (slice_cmp(&s, &decl->s) == 0) {
 			return decl;
+		}
+	}
+
+	return NULL;
+}
+
+struct nametype *
+findparam(struct nametypes *params, struct slice s)
+{
+	struct nametype *param;
+	for (int i = 0; i < params->len; i++) {
+		param = &(params->data[i]);
+		if (slice_cmp(&s, &param->name) == 0) {
+			return param;
 		}
 	}
 
@@ -41,13 +61,12 @@ expect(enum tokentype type)
 }
 
 static void
-parsestring()
+parsestring(struct expr *expr)
 {
-	struct expr expr;
-	expr.start = tok;
-	expr.kind = EXPR_LIT;
-	expr.class = C_STR;
-	expr.d.v.v.s = (struct slice){ 0 };
+	expr->start = tok;
+	expr->kind = EXPR_LIT;
+	expr->class = C_STR;
+	expr->d.v.v.s = (struct slice){ 0 };
 	struct slice str = tok->slice;
 	for (size_t i = 0; i < str.len; i++) {
 		switch (str.data[i]) {
@@ -57,11 +76,11 @@ parsestring()
 				switch (str.data[i]) {
 				case 'n':
 					c = '\n';
-					array_add((&expr.d.v.v.s), c);
+					array_add((&expr->d.v.v.s), c);
 					break;
 				case '\\':
 					c = '\\';
-					array_add((&expr.d.v.v.s), c);
+					array_add((&expr->d.v.v.s), c);
 					break;
 				default:
 					error(tok->line, tok->col, "invalid string escape!");
@@ -71,10 +90,10 @@ parsestring()
 			}
 			break;
 		default:
-			array_add((&expr.d.v.v.s), str.data[i]);
+			array_add((&expr->d.v.v.s), str.data[i]);
 		}
 	}
-		tok = tok->next;
+	tok = tok->next;
 }
 
 static struct block parseblock();
@@ -115,6 +134,8 @@ parseexpr()
 			expr.kind = EXPR_PROC;
 			expr.class = C_PROC;
 			tok = tok->next;
+			if (tok->type == TOK_LPAREN)
+				parsenametypes(&expr.d.proc.params);
 			expr.d.proc.block = parseblock();
 		// a function call
 		} else if (tok->next && tok->next->type == TOK_LPAREN) {
@@ -168,7 +189,7 @@ binary_common:
 		expr.class = exprs.data[expr.left].class;
 		break;
 	case TOK_STRING:
-		parsestring();
+		parsestring(&expr);
 		break;
 	default:
 		error(tok->line, tok->col, "invalid token for expression");
@@ -177,6 +198,76 @@ binary_common:
 	array_add((&exprs), expr);
 
 	return exprs.len - 1;
+}
+
+static size_t
+parsetype()
+{
+	uint8_t hash[16];
+	struct type type = { 0 };
+	struct mapkey key;
+	size_t offset;
+	union mapval val;
+
+	if (strncmp(tok->slice.data, "proc", 3) == 0) {
+		size_t subtype;
+		type.class = TYPE_PROC;
+		tok = tok->next;
+		if (tok->type == TOK_LPAREN) {
+			tok = tok->next;
+			while (tok->type != TOK_RPAREN) {
+				expect(TOK_NAME);
+				subtype = parsetype();
+
+				array_add((&type.d.typelist), subtype);
+
+				if (tok->type == TOK_RPAREN)
+					break;
+
+				expect(TOK_COMMA);
+				tok = tok->next;
+			}
+
+			tok = tok->next;
+		}
+	} else {
+		mapkey(&key, tok->slice.data, tok->slice.len);
+		val = mapget(typesmap, &key);
+		if (!val.n)
+			error(tok->line, tok->col, "unknown type");
+
+		tok = tok->next;
+		return val.n;
+	}
+
+	return type_put(&type);
+}
+
+static void
+parsenametypes(struct nametypes *nametypes)
+{
+	expect(TOK_LPAREN);
+	tok = tok->next;
+	struct nametype nametype;
+	while (tok->type != TOK_RPAREN) {
+		nametype = (struct nametype){ 0 };
+
+		expect(TOK_NAME);
+		nametype.name = tok->slice;
+		tok = tok->next;
+
+		nametype.type = parsetype();
+
+		array_add(nametypes, nametype);
+
+		if (tok->type == TOK_RPAREN)
+			break;
+
+		expect(TOK_COMMA);
+		tok = tok->next;
+	}
+
+	tok = tok->next;
 }
 
 static struct block
@@ -204,18 +295,7 @@ parseblock()
 			decl.s = tok->slice;
 			tok = tok->next;
 
-			expect(TOK_NAME);
-			if (strncmp(tok->slice.data, "i64", 3) == 0) {
-				decl.type = TYPE_I64;
-			} else if (strncmp(tok->slice.data, "str", 3) == 0) {
-				decl.type = TYPE_STR;
-			} else if (strncmp(tok->slice.data, "proc", 3) == 0) {
-				decl.type = TYPE_PROC;
-			} else {
-				error(tok->line, tok->col, "unknown type");
-			}
-
-			tok = tok->next;
+			decl.type = parsetype();
 			expect(TOK_EQUAL);
 			tok = tok->next;
 

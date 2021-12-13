@@ -1,0 +1,14 @@
+let write proc(i64, str, i64) = proc(fd i64, string str, len i64) {
+	syscall(1, fd, string, len)
+	return
+}
+
+
+let exit proc(i64) = proc(code i64) {
+	syscall(60, code)
+}
+
+let main proc = proc {
+	write(1, "hello", 5)
+	exit(0)
+}

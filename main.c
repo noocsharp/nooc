@@ -18,6 +18,9 @@
 #include "elf.h"
 #include "lex.h"
 #include "parse.h"
+#include "type.h"
+#include "map.h"
+#include "blockstack.c"
 
 const char const *tokenstr[] = {
 	[TOK_NONE] = "TOK_NONE",
@@ -40,9 +43,11 @@ const char const *tokenstr[] = {
 	[TOK_RETURN] = "TOK_RETURN",
 };
 
+struct map *typesmap;
 struct decls decls;
 struct assgns assgns;
 struct exprs exprs;
+extern struct types types;
 
 char *infile;
 
@@ -153,10 +158,12 @@ typecheck(struct block items)
 		struct item *item = &items.data[i];
 		struct expr *expr;
 		struct decl *decl;
+		struct type *type;
 		switch (items.data[i].kind) {
 		case ITEM_DECL:
 			decl = &decls.data[item->idx];
-			switch (decl->type) {
+			type = &types.data[decl->type];
+			switch (type->class) {
 			case TYPE_I64:
 				expr = &exprs.data[decl->val];
 				// FIXME: we should be able to deal with ident or fcalls
@@ -169,6 +176,8 @@ typecheck(struct block items)
 				if (expr->class != C_STR)
 					error(decl->start->line, decl->start->col, "expected string expression for string declaration");
 				break;
+
+			// !!!!! FIXME: CHECK PARAMETER TYPES !!!!!!
 			case TYPE_PROC:
 				expr = &exprs.data[decl->val];
 				if (expr->class != C_PROC)
@@ -183,7 +192,9 @@ typecheck(struct block items)
 			decl = finddecl(&items, assgn->s);
 			if (decl == NULL)
 				error(assgn->start->line, assgn->start->col, "unknown name");
-			switch (decl->type) {
+
+			type = &types.data[decl->type];
+			switch (type->class) {
 			case TYPE_I64:
 				expr = &exprs.data[assgn->val];
 				// FIXME: we should be able to deal with ident or fcalls
@@ -208,12 +219,31 @@ typecheck(struct block items)
 	}
 }
 
+
+// type must be in params - probably should come up with better interface
+ssize_t
+paramoffset(struct nametypes *params, struct nametype *nametype)
+{
+	ssize_t offset = 0;
+	struct type *type;
+	for (size_t i = params->len - 1; i >= 0; i--) {
+		type = &types.data[params->data[i].type];
+		offset += type->size;
+		if (&params->data[i] == nametype)
+			break;
+	}
+
+	// compensate for %rbp push onto stack
+	return offset + 8;
+}
+
 size_t
 genexpr(char *buf, size_t idx, enum reg reg)
 {
 	size_t len = 0;
 	char *ptr = buf;
 	struct expr *expr = &exprs.data[idx];
+
 	if (expr->kind == EXPR_LIT) {
 		switch (expr->class) {
 		case C_INT:
@@ -251,13 +281,46 @@ genexpr(char *buf, size_t idx, enum reg reg)
 		freereg(rreg);
 	} else if (expr->kind == EXPR_IDENT) {
 		struct decl *decl = finddecl(curitems, expr->d.s);
-		if (decl == NULL) {
-			error(expr->start->line, expr->start->col, "unknown name!");
+		if (decl != NULL) {
+			len += mov_r64_m64(ptr ? ptr + len : ptr, reg, decl->addr);
+			return len;
 		}
-		len += mov_r64_m64(ptr ? ptr + len : ptr, reg, decl->addr);
+
+		struct nametype *param = findparam(&curproc->params, expr->d.s);
+		if (param != NULL) {
+			// calculate offset
+			int8_t offset = paramoffset(&curproc->params, param);
+			len += mov_disp8_m64_r64(buf ? buf + len : NULL, reg, RBP, offset);
+			return len;
+		}
+
+		error(expr->start->line, expr->start->col, "genexpr: unknown name '%.*s'", expr->d.s.len, expr->d.s.data);
 	} else {
 		error(expr->start->line, expr->start->col, "genexpr: could not generate code for expression");
 	}
+	return len;
+}
+
+size_t
+gencall(char *buf, size_t addr, struct expr *expr)
+{
+	size_t len = 0;
+	struct fparams *params = &expr->d.call.params;
+	if (params->len > 7)
+		error(expr->start->line, expr->start->col, "syscall can take at most 7 parameters");
+
+	enum reg reg = getreg();
+
+	for (int i = 0; i < params->len; i++) {
+		len += genexpr(buf ? buf + len : NULL, params->data[i], reg);
+		len += push_r64(buf ? buf + len : NULL, reg);
+	}
+
+	len += mov_r_imm(buf ? buf + len : NULL, reg, addr);
+	len += call(buf ? buf + len : NULL, reg);
+
+	freereg(reg);
+
 	return len;
 }
 
@@ -287,6 +350,8 @@ gensyscall(char *buf, struct expr *expr)
 	return len;
 }
 
+size_t genproc(char *buf, struct proc *proc);
+
 // FIXME: It is not ideal to calculate length by doing all the calculations to generate instruction, before we actually write the instructions.
 size_t
 genblock(char *buf, struct block *block)
@@ -306,10 +371,7 @@ genblock(char *buf, struct block *block)
 						error(expr->start->line, expr->start->col, "unknown function!");
 					}
 
-					enum reg reg = getreg();
-					total += mov_r_imm(buf ? buf + total : NULL, reg, decl->addr);
-					total += call(buf ? buf + total : NULL, reg);
-					freereg(reg);
+					total += gencall(buf ? buf + total : NULL, decl->addr, expr);
 				}
 
 			} else if (expr->kind == EXPR_COND) {
@@ -361,7 +423,10 @@ genblock(char *buf, struct block *block)
 				break;
 			case C_PROC:
 				decls.data[item->idx].addr = total + TEXT_OFFSET;
-				total += genblock(buf ? buf + total : NULL, &(expr->d.proc.block));
+				// FIXME: won't work for nested functions
+				curproc = &expr->d.proc;
+				total += genproc(buf ? buf + total : NULL, &(expr->d.proc));
+				curproc = NULL;
 				break;
 			default:
 				error(expr->start->line, expr->start->col, "cannot generate code for unknown expression class");
@@ -394,11 +459,24 @@ genblock(char *buf, struct block *block)
 				error(expr->start->line, expr->start->col, "cannot generate code for unknown expression class");
 			}
 		} else if (item->kind == ITEM_RETURN) {
+			total += pop_r64(buf ? buf + total : NULL, RBP);
 			total += ret(buf ? buf + total : NULL);
 		} else {
 			error(item->start->line, item->start->col, "cannot generate code for type");
 		}
 	}
+
+	return total;
+}
+
+size_t
+genproc(char *buf, struct proc *proc)
+{
+	size_t total = 0;
+
+	total += push_r64(buf ? buf + total : NULL, RBP);
+	total += mov_r64_r64(buf ? buf + total : NULL, RBP, RSP);
+	total += genblock(buf ? buf + total : NULL, &proc->block);
 
 	return total;
 }
@@ -434,6 +512,9 @@ main(int argc, char *argv[])
 	}
 
 	struct token *head = lex((struct slice){statbuf.st_size, statbuf.st_size, addr});
+
+	typesmap = mkmap(16);
+	inittypes();
 	struct block items = parse(head);
 	typecheck(items);
 

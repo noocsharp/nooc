@@ -51,11 +51,42 @@ struct fcall {
 	struct fparams params;
 };
 
-// FIXME: make a struct for more complex types
-enum type {
-	TYPE_I64,
+struct typelist {
+	size_t cap;
+	size_t len;
+	size_t *data; // struct types
+};
+
+enum typeclass {
+	TYPE_I64 = 1,
 	TYPE_STR,
 	TYPE_PROC,
+};
+
+// FIXME: types should probably be stored in a hash table
+struct type {
+	enum typeclass class;
+	size_t size;
+	union {
+		struct typelist typelist;
+	} d;
+};
+
+struct nametype {
+	struct slice name;
+	size_t type; // struct types
+};
+
+struct types {
+	size_t cap;
+	size_t len;
+	struct type *data;
+};
+
+struct nametypes {
+	size_t cap;
+	size_t len;
+	struct nametype *data;
 };
 
 struct assgn {
@@ -72,7 +103,7 @@ struct assgns {
 
 struct decl {
 	struct slice s;
-	enum type type;
+	size_t type;
 	size_t val; // struct exprs
 	size_t addr;
 	struct token *start;
@@ -118,6 +149,7 @@ struct loop {
 };
 
 struct proc {
+	struct nametypes params;
 	struct block block;
 };
 

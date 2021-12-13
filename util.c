@@ -48,3 +48,23 @@ die(char *error)
 	fprintf(stderr, "%s\n", error);
 	exit(1);
 }
+
+void *
+xmalloc(size_t size)
+{
+	char *p = malloc(size);
+	if (!p)
+		die("malloc failed!");
+
+	return p;
+}
+
+void *
+xcalloc(size_t nelem, size_t elsize)
+{
+	char *p = calloc(nelem, elsize);
+	if (!p)
+		die("calloc failed!");
+
+	return p;
+}
