@@ -1,0 +1,8 @@
+let exit proc(str) = proc(code i64) {
+	syscall(60, code)
+	return
+}
+
+let main proc = proc {
+	exit(0)
+}

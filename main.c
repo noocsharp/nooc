@@ -177,7 +177,6 @@ typecheck(struct block items)
 					error(decl->start->line, decl->start->col, "expected string expression for string declaration");
 				break;
 
-			// !!!!! FIXME: CHECK PARAMETER TYPES !!!!!!
 			case TYPE_PROC:
 				expr = &exprs.data[decl->val];
 				if (expr->class != C_PROC)
@@ -185,6 +184,11 @@ typecheck(struct block items)
 
 				if (expr->d.proc.params.len != type->d.typelist.len)
 					error(decl->start->line, decl->start->col, "procedure expression takes %u parameters, but declaration has type which takes %u", expr->d.proc.params.len, type->d.typelist.len);
+
+				for (size_t j = 0; j < expr->d.proc.params.len; j++) {
+					if (expr->d.proc.params.data[j].type != type->d.typelist.data[j])
+						error(decl->start->line, decl->start->col, "unexpected type for parameter %u in procedure declaration", j);
+				}
 				break;
 			default:
 				error(decl->start->line, decl->start->col, "unknown decl type");
