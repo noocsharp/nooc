@@ -1,4 +1,6 @@
 let main proc = proc {
 	let i i64 = 10
 	i = 5
+
+	syscall(60, 0)
 }
