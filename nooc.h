@@ -1,6 +1,8 @@
 #define TEXT_OFFSET 0x101000
 #define DATA_OFFSET 0x102000
 
+#define BLOCKSTACKSIZE 32
+
 enum tokentype {
 	TOK_NONE = 0,
 	TOK_NAME,

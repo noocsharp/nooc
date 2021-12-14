@@ -20,7 +20,9 @@
 #include "parse.h"
 #include "type.h"
 #include "map.h"
-#include "blockstack.c"
+#include "blockstack.h"
+
+struct proc *curproc;
 
 const char *const tokenstr[] = {
 	[TOK_NONE] = "TOK_NONE",

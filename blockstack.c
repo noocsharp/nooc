@@ -1,9 +1,14 @@
-#define BLOCKSTACKSIZE 32
-static struct block *blockstack[BLOCKSTACKSIZE];
-static size_t blocki;
-static struct proc *curproc;
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
 
-static void
+#include "nooc.h"
+#include "util.h"
+
+struct block *blockstack[BLOCKSTACKSIZE];
+size_t blocki;
+
+void
 blockpush(struct block *block)
 {
 	if (blocki >= BLOCKSTACKSIZE - 1)
@@ -13,7 +18,7 @@ blockpush(struct block *block)
 	blocki++;
 }
 
-static struct block *
+struct block *
 blockpop()
 {
 	if (blocki == 0)
@@ -23,13 +28,12 @@ blockpop()
 	return blockstack[blocki];
 }
 
-static struct block *
+struct block *
 blockpeek()
 {
 	if (blocki == 0)
 		die("blockpop: cannot peek empty stack!");
 
-	blocki--;
 	return blockstack[blocki - 1];
 }
 
