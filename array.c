@@ -6,7 +6,7 @@
 #include "array.h"
 
 int
-_array_add(void **data, size_t size, size_t count, size_t *len, size_t *cap, void *new)
+_array_add(void **data, size_t *len, size_t *cap, void *new, size_t size, size_t count)
 {
 	bool need_realloc;
 	while (*cap < *len + count) {
