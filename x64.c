@@ -130,7 +130,7 @@ mov_r64_r64(char *buf, enum reg dest, enum reg src)
 size_t
 mov_disp8_m64_r64(char *buf, enum reg dest, int8_t disp, enum reg src)
 {
-	uint8_t mov[] = {0x48, 0x8b};
+	uint8_t mov[] = {0x48, 0x89};
 	assert(src != 4);
 	if (buf) {
 		memcpy(buf, mov, 2);
