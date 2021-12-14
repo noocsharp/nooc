@@ -14,7 +14,7 @@ unsigned short used_reg;
 void
 clearreg()
 {
-	used_reg = 0;
+	used_reg = RBP | RSP;
 }
 
 enum reg

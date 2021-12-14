@@ -596,6 +596,7 @@ main(int argc, char *argv[])
 	struct block items = parse(head);
 	typecheck(items);
 
+	clearreg();
 	size_t len = genblock(NULL, &items, true);
 	char *text = malloc(len);
 	if (!text) {
@@ -603,6 +604,7 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
+	clearreg();
 	size_t len2 = genblock(text, &items, true);
 	assert(len == len2);
 
