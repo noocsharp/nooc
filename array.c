@@ -25,3 +25,25 @@ _array_add(void **data, size_t *len, size_t *cap, void *new, size_t size, size_t
 
 	return *len;
 }
+
+// should only be called when size is 1
+int
+_array_zero(void **data, size_t *len, size_t *cap, size_t count)
+{
+	bool need_realloc;
+	while (*cap < *len + count) {
+		need_realloc = true;
+		*cap = *cap ? *cap * 2 : 1;
+	}
+
+	if (need_realloc) {
+		*data = realloc(*data, *cap);
+		if (*data == NULL)
+			return -1;
+	}
+
+	memset((char *)*data + *len, 0, count);
+	*len += count;
+
+	return *len;
+}
