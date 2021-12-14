@@ -97,7 +97,7 @@ decl_fromreg(char *buf, struct decl *decl, enum reg reg)
 		total += mov_m64_r64(buf ? buf + total : NULL, decl->loc.addr, reg);
 		break;
 	case DECL_STACK:
-		total += mov_disp8_m64_r64(buf, reg, decl->loc.off, RBP);
+		total += mov_disp8_m64_r64(buf, reg, -decl->loc.off, RBP);
 		break;
 	default:
 		fprintf(stderr, "%d\n", decl->kind);
@@ -117,7 +117,7 @@ decl_toreg(char *buf, enum reg reg, struct decl *decl)
 		total += mov_r64_m64(buf ? buf + total : NULL, reg, decl->loc.addr);
 		break;
 	case DECL_STACK:
-		total += mov_disp8_r64_m64(buf, reg, RBP, decl->loc.off);
+		total += mov_disp8_r64_m64(buf, reg, RBP, -decl->loc.off);
 		break;
 	default:
 		die("unknown decl type!");
