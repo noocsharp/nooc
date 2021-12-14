@@ -65,7 +65,6 @@ enum typeclass {
 	TYPE_PROC,
 };
 
-// FIXME: types should probably be stored in a hash table
 struct type {
 	enum typeclass class;
 	size_t size;
@@ -107,7 +106,15 @@ struct decl {
 	struct slice s;
 	size_t type;
 	size_t val; // struct exprs
-	size_t addr;
+	bool declared;
+	enum {
+		DECL_STACK,
+		DECL_DATA
+	} kind;
+	union {
+		size_t off;
+		size_t addr;
+	} loc;
 	struct token *start;
 };
 
@@ -135,6 +142,12 @@ struct item {
 };
 
 struct block {
+	struct {
+		size_t cap;
+		size_t len;
+		struct decl *data;
+	} decls;
+	size_t datasize;
 	size_t cap;
 	size_t len;
 	struct item *data;

@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -127,7 +128,22 @@ mov_r64_r64(char *buf, enum reg dest, enum reg src)
 }
 
 size_t
-mov_disp8_m64_r64(char *buf, enum reg dest, enum reg src, int8_t disp)
+mov_disp8_m64_r64(char *buf, enum reg dest, int8_t disp, enum reg src)
+{
+	uint8_t mov[] = {0x48, 0x8b};
+	assert(src != 4);
+	if (buf) {
+		memcpy(buf, mov, 2);
+		buf += 2;
+		*(buf++) = (MOD_DISP8 << 6) | (dest << 3) | src;
+		*(buf++) = disp;
+	}
+
+	return 4;
+}
+
+size_t
+mov_disp8_r64_m64(char *buf, enum reg dest, enum reg src, int8_t disp)
 {
 	uint8_t mov[] = {0x48, 0x8b};
 	assert(src != 4);
@@ -167,6 +183,24 @@ sub_r64_r64(char *buf, enum reg reg1, enum reg reg2)
 	}
 
 	return 3;
+}
+
+size_t
+sub_r64_imm(char *buf, enum reg dest, int32_t imm)
+{
+	uint8_t mov[] = {0x48, 0x81};
+	uint8_t op1 = (MOD_DIRECT << 6) | (5 << 3) | dest;
+	if (buf) {
+		memcpy(buf, mov, 2);
+		buf += 2;
+		*(buf++) = op1;
+		*(buf++) = imm & 0xFF;
+		*(buf++) = (imm >> 8) & 0xFF;
+		*(buf++) = (imm >> 16) & 0xFF;
+		*(buf++) = (imm >> 24) & 0xFF;
+	}
+
+	return 7;
 }
 
 size_t

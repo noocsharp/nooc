@@ -1,4 +1,5 @@
 #include <elf.h>
+#include <stdbool.h>
 #include <stdio.h>
 
 #include "nooc.h"

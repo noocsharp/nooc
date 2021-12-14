@@ -22,6 +22,8 @@
 #include "map.h"
 #include "blockstack.h"
 
+extern struct block *blockstack[BLOCKSTACKSIZE];
+extern size_t blocki;
 struct proc *curproc;
 
 const char *const tokenstr[] = {
@@ -46,7 +48,6 @@ const char *const tokenstr[] = {
 };
 
 struct map *typesmap;
-struct decls decls;
 struct assgns assgns;
 struct exprs exprs;
 extern struct types types;
@@ -63,10 +64,66 @@ data_push(char *ptr, size_t len)
 }
 
 uint64_t
-data_pushint(uint64_t i)
+data_pushzero(size_t len)
 {
-	array_push((&data_seg), (&i), 8);
-	return DATA_OFFSET + data_seg.len - 8;
+	array_zero((&data_seg), len);
+	return DATA_OFFSET + data_seg.len - len;
+}
+
+void
+decl_alloc(struct block *block, struct decl *decl)
+{
+	struct type *type = &types.data[decl->type];
+	switch (decl->kind) {
+	case DECL_DATA:
+		decl->loc.addr = data_pushzero(type->size);
+		break;
+	case DECL_STACK:
+		decl->loc.off = block->datasize;
+		block->datasize += type->size;
+		break;
+	default:
+		die("decl_alloc: unknown decl kind");
+	}
+}
+
+/* FIXME: handle things beside 64-bit integers */
+size_t
+decl_fromreg(char *buf, struct decl *decl, enum reg reg)
+{
+	size_t total = 0;
+	switch (decl->kind) {
+	case DECL_DATA:
+		total += mov_m64_r64(buf ? buf + total : NULL, decl->loc.addr, reg);
+		break;
+	case DECL_STACK:
+		total += mov_disp8_m64_r64(buf, reg, decl->loc.off, RBP);
+		break;
+	default:
+		fprintf(stderr, "%d\n", decl->kind);
+		die("decl_fromreg: unknown decl kind");
+	}
+
+	return total;
+}
+
+/* FIXME: handle things beside 64-bit integers */
+size_t
+decl_toreg(char *buf, enum reg reg, struct decl *decl)
+{
+	size_t total = 0;
+	switch (decl->kind) {
+	case DECL_DATA:
+		total += mov_r64_m64(buf ? buf + total : NULL, reg, decl->loc.addr);
+		break;
+	case DECL_STACK:
+		total += mov_disp8_r64_m64(buf, reg, RBP, decl->loc.off);
+		break;
+	default:
+		die("unknown decl type!");
+	}
+
+	return total;
 }
 
 struct block *curitems;
@@ -168,7 +225,7 @@ typecheck(struct block items)
 		struct type *type;
 		switch (items.data[i].kind) {
 		case ITEM_DECL:
-			decl = &decls.data[item->idx];
+			decl = &items.decls.data[item->idx];
 			type = &types.data[decl->type];
 			switch (type->class) {
 			case TYPE_I64:
@@ -203,7 +260,7 @@ typecheck(struct block items)
 			break;
 		case ITEM_ASSGN:
 			struct assgn *assgn = &assgns.data[item->idx];
-			decl = finddecl(&items, assgn->s);
+			decl = finddecl(assgn->s);
 			if (decl == NULL)
 				error(assgn->start->line, assgn->start->col, "unknown name");
 
@@ -294,9 +351,9 @@ genexpr(char *buf, size_t idx, enum reg reg)
 		}
 		freereg(rreg);
 	} else if (expr->kind == EXPR_IDENT) {
-		struct decl *decl = finddecl(curitems, expr->d.s);
+		struct decl *decl = finddecl(expr->d.s);
 		if (decl != NULL) {
-			len += mov_r64_m64(ptr ? ptr + len : ptr, reg, decl->addr);
+			len += decl_toreg(ptr ? ptr + len : NULL, reg, decl);
 			return len;
 		}
 
@@ -304,7 +361,7 @@ genexpr(char *buf, size_t idx, enum reg reg)
 		if (param != NULL) {
 			// calculate offset
 			int8_t offset = paramoffset(&curproc->params, param);
-			len += mov_disp8_m64_r64(buf ? buf + len : NULL, reg, RBP, offset);
+			len += mov_disp8_m64_r64(buf ? buf + len : NULL, reg, offset, RBP);
 			return len;
 		}
 
@@ -368,24 +425,24 @@ size_t genproc(char *buf, struct proc *proc);
 
 // FIXME: It is not ideal to calculate length by doing all the calculations to generate instruction, before we actually write the instructions.
 size_t
-genblock(char *buf, struct block *block)
+genblock(char *buf, struct block *block, bool toplevel)
 {
+	blockpush(block);
 	size_t total = 0;
 	for (int i = 0; i < block->len; i++) {
 		struct item *item = &block->data[i];
 		if (item->kind == ITEM_EXPR) {
 			struct expr *expr = &exprs.data[item->idx];
-			// FIXME: 7 should not be hardcoded here
 			if (expr->kind == EXPR_FCALL) {
 				if (slice_cmplit(&expr->d.call.name, "syscall") == 0) {
 					total += gensyscall(buf ? buf + total : NULL, expr);
 				} else {
-					struct decl *decl = finddecl(block, expr->d.call.name);
+					struct decl *decl = finddecl(expr->d.call.name);
 					if (decl == NULL) {
 						error(expr->start->line, expr->start->col, "unknown function!");
 					}
 
-					total += gencall(buf ? buf + total : NULL, decl->addr, expr);
+					total += gencall(buf ? buf + total : NULL, decl->loc.addr, expr);
 				}
 
 			} else if (expr->kind == EXPR_COND) {
@@ -394,8 +451,8 @@ genblock(char *buf, struct block *block)
 				assert(binary->kind == EXPR_BINARY);
 				enum reg reg = getreg();
 				total += genexpr(buf ? buf + total : NULL, expr->d.cond.cond, reg);
-				size_t iflen = genblock(NULL, &expr->d.cond.bif) + jmp(NULL, 0);
-				size_t elselen = genblock(NULL, &expr->d.cond.belse);
+				size_t iflen = genblock(NULL, &expr->d.cond.bif, false) + jmp(NULL, 0);
+				size_t elselen = genblock(NULL, &expr->d.cond.belse, false);
 				switch (binary->d.op) {
 				case OP_GREATER:
 					total += jng(buf ? buf + total : NULL, iflen);
@@ -403,40 +460,41 @@ genblock(char *buf, struct block *block)
 				default:
 					error(expr->start->line, expr->start->col, "unknown binop for conditional");
 				}
-				total += genblock(buf ? buf + total : NULL, &expr->d.cond.bif);
+				total += genblock(buf ? buf + total : NULL, &expr->d.cond.bif, false);
 				total += jmp(buf ? buf + total: NULL, elselen);
-				total += genblock(buf ? buf + total : NULL, &expr->d.cond.belse);
+				total += genblock(buf ? buf + total : NULL, &expr->d.cond.belse, false);
 			} else if (expr->kind == EXPR_LOOP) {
-				size_t back = genblock(NULL, &expr->d.loop.block) + jmp(NULL, 0);
-				total += genblock(buf ? buf + total : NULL, &expr->d.loop.block);
+				size_t back = genblock(NULL, &expr->d.loop.block, false) + jmp(NULL, 0);
+				total += genblock(buf ? buf + total : NULL, &expr->d.loop.block, false);
 				total += jmp(buf ? buf + total: NULL, -back);
 			} else {
 				error(expr->start->line, expr->start->col, "unhandled toplevel expression type!");
 			}
 		} else if (item->kind == ITEM_DECL) {
-			struct expr *expr = &exprs.data[decls.data[item->idx].val];
+			struct decl *decl = &block->decls.data[item->idx];
+			struct expr *expr = &exprs.data[decl->val];
+			uint64_t addr;
+			enum reg reg = getreg();
+
+			decl->kind = toplevel ? DECL_DATA : DECL_STACK;
+			decl_alloc(block, decl);
+
 			switch (expr->class) {
 			case C_INT:
-				// this is sort of an optimization, since we write at compile-time instead of evaluating and storing. should this happen here in the long term?
-				if (expr->kind == EXPR_LIT) {
-					if (buf)
-						decls.data[item->idx].addr = data_pushint(expr->d.v.v.i);
-				} else {
-					if (buf)
-						decls.data[item->idx].addr = data_pushint(0);
-					enum reg reg = getreg();
-					total += genexpr(buf ? buf + total : NULL, decls.data[item->idx].val, reg);
-					total += mov_m64_r64(buf ? buf + total : NULL, decls.data[item->idx].addr, reg);
-					freereg(reg);
-				}
+				// FIXME: we can store literals at compile time
+				total += genexpr(buf ? buf + total : NULL, block->decls.data[item->idx].val, reg);
+				total += decl_fromreg(buf ? buf + total : NULL, decl, reg);
 				break;
 			// FIXME: we assume that any string is a literal, may break if we add binary operands on strings in the future.
 			case C_STR:
-				if (buf)
-					decls.data[item->idx].addr = data_pushint(data_push(expr->d.v.v.s.data, expr->d.v.v.s.len));
+				if (buf) {
+					addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
+				}
+				total += mov_r_imm(buf ? buf + total : NULL, reg, addr);
+				total += decl_fromreg(buf ? buf + total : NULL, decl, reg);
 				break;
 			case C_PROC:
-				decls.data[item->idx].addr = total + TEXT_OFFSET;
+				block->decls.data[item->idx].loc.addr = total + TEXT_OFFSET;
 				// FIXME: won't work for nested functions
 				curproc = &expr->d.proc;
 				total += genproc(buf ? buf + total : NULL, &(expr->d.proc));
@@ -445,14 +503,17 @@ genblock(char *buf, struct block *block)
 			default:
 				error(expr->start->line, expr->start->col, "cannot generate code for unknown expression class");
 			}
+
+			decl->declared = true;
+			freereg(reg);
 		} else if (item->kind == ITEM_ASSGN) {
 			struct expr *expr = &exprs.data[assgns.data[item->idx].val];
 			struct assgn *assgn = &assgns.data[item->idx];
-			struct decl *decl = finddecl(block, assgn->s);
+			struct decl *decl = finddecl(assgn->s);
 			if (decl == NULL)
 				error(assgn->start->line, assgn->start->col, "unknown name");
 
-			if (buf && decl->addr == 0)
+			if (!decl->declared)
 				error(assgn->start->line, assgn->start->col, "assignment before declaration");
 
 			switch (expr->class) {
@@ -460,25 +521,27 @@ genblock(char *buf, struct block *block)
 				// this is sort of an optimization, since we write at compile-time instead of evaluating and storing. should this happen here in the long term?
 				enum reg reg = getreg();
 				total += genexpr(buf ? buf + total : NULL, assgn->val, reg);
-				total += mov_m64_r64(buf ? buf + total : NULL, decl->addr, reg);
+				total += decl_fromreg(buf ? buf + total : NULL, decl, reg);
 				freereg(reg);
 				break;
 			// FIXME: we assume that any string is a literal, may break if we add binary operands on strings in the future.
 			case C_STR:
 				size_t addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
 				total += mov_r_imm(buf ? buf + total : NULL, reg, addr);
-				total += mov_m64_r64(buf ? buf + total : NULL, decl->addr, reg);
+				total += decl_fromreg(buf ? buf + total : NULL, decl, reg);
 				break;
 			default:
 				error(expr->start->line, expr->start->col, "cannot generate code for unknown expression class");
 			}
 		} else if (item->kind == ITEM_RETURN) {
+			total += mov_r64_r64(buf ? buf + total : NULL, RSP, RBP);
 			total += pop_r64(buf ? buf + total : NULL, RBP);
 			total += ret(buf ? buf + total : NULL);
 		} else {
 			error(item->start->line, item->start->col, "cannot generate code for type");
 		}
 	}
+	blockpop();
 
 	return total;
 }
@@ -490,7 +553,8 @@ genproc(char *buf, struct proc *proc)
 
 	total += push_r64(buf ? buf + total : NULL, RBP);
 	total += mov_r64_r64(buf ? buf + total : NULL, RBP, RSP);
-	total += genblock(buf ? buf + total : NULL, &proc->block);
+	total += sub_r64_imm(buf ? buf + total : NULL, RSP, proc->block.datasize + 8);
+	total += genblock(buf ? buf + total : NULL, &proc->block, false);
 
 	return total;
 }
@@ -532,14 +596,14 @@ main(int argc, char *argv[])
 	struct block items = parse(head);
 	typecheck(items);
 
-	size_t len = genblock(NULL, &items);
+	size_t len = genblock(NULL, &items, true);
 	char *text = malloc(len);
 	if (!text) {
 		fprintf(stderr, "text allocation failed!");
 		return 1;
 	}
 
-	size_t len2 = genblock(text, &items);
+	size_t len2 = genblock(text, &items, true);
 	assert(len == len2);
 
 	FILE *out = fopen(argv[2], "w");
@@ -549,14 +613,16 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	struct decl *main = finddecl(&items, (struct slice){4, 4, "main"});
+	blockpush(&items);
+	struct decl *main = finddecl((struct slice){4, 4, "main"});
 	if (main == NULL) {
 		fprintf(stderr, "main function not found\n");
 		return 1;
 	}
+	blockpop();
 	munmap(addr, statbuf.st_size);
 
-	elf(main->addr, text, len, data_seg.data, data_seg.len, out);
+	elf(main->loc.addr, text, len, data_seg.data, data_seg.len, out);
 
 	fclose(out);
 }

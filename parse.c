@@ -10,10 +10,14 @@
 #include "array.h"
 #include "type.h"
 #include "map.h"
+#include "blockstack.h"
+
+extern struct block *blockstack[BLOCKSTACKSIZE];
+extern size_t blocki;
+extern struct proc *curproc;
 
 extern const char *const tokenstr[];
 
-extern struct decls decls;
 extern struct assgns assgns;
 extern struct exprs exprs;
 extern struct types types;
@@ -24,12 +28,14 @@ struct token *tok;
 static void parsenametypes(struct nametypes *nametypes);
 
 struct decl *
-finddecl(struct block *items, struct slice s)
+finddecl(struct slice s)
 {
-	for (int i = 0; i < decls.len; i++) {
-		struct decl *decl = &(decls.data[i]);
-		if (slice_cmp(&s, &decl->s) == 0) {
-			return decl;
+	for (int j = blocki - 1; j >= 0; j--) {
+		for (int i = 0; i < blockstack[j]->decls.len; i++) {
+			struct decl *decl = &(blockstack[j]->decls.data[i]);
+			if (slice_cmp(&s, &decl->s) == 0) {
+				return decl;
+			}
 		}
 	}
 
@@ -275,6 +281,7 @@ parseblock()
 	struct item item;
 	bool curlies = false;
 
+	blockpush(&items);
 	if (tok->type == TOK_LCURLY) {
 		curlies = true;
 		tok = tok->next;
@@ -298,14 +305,14 @@ parseblock()
 			tok = tok->next;
 
 			// FIXME: scoping
-			if (finddecl(&items, decl.s)) {
+			if (finddecl(decl.s)) {
 				error(tok->line, tok->col, "repeat declaration!");
 			}
 
 			decl.val = parseexpr();
-			array_add((&decls), decl);
+			array_add((&items.decls), decl);
 
-			item.idx = decls.len - 1;
+			item.idx = items.decls.len - 1;
 			array_add((&items), item);
 		} else if (tok->type == TOK_RETURN) {
 			item.kind = ITEM_RETURN;
@@ -335,6 +342,7 @@ parseblock()
 		tok = tok->next;
 	}
 
+	blockpop();
 	return items;
 }
 
