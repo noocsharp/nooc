@@ -287,7 +287,7 @@ parseblock()
 		tok = tok->next;
 	}
 
-	while (tok->type != TOK_NONE && tok->type != TOK_RCURLY) {
+	while (!(tok->type == TOK_NONE || (curlies && tok->type == TOK_RCURLY))) {
 		item = (struct item){ 0 };
 		item.start = tok;
 		if (tok->type == TOK_LET) {
