@@ -223,6 +223,7 @@ typecheck(struct block items)
 		struct expr *expr;
 		struct decl *decl;
 		struct type *type;
+		struct assgn *assgn;
 		switch (items.data[i].kind) {
 		case ITEM_DECL:
 			decl = &items.decls.data[item->idx];
@@ -259,7 +260,7 @@ typecheck(struct block items)
 			}
 			break;
 		case ITEM_ASSGN:
-			struct assgn *assgn = &assgns.data[item->idx];
+			assgn = &assgns.data[item->idx];
 			decl = finddecl(assgn->s);
 			if (decl == NULL)
 				error(assgn->start->line, assgn->start->col, "unknown name");
@@ -510,6 +511,7 @@ genblock(char *buf, struct block *block, bool toplevel)
 			struct expr *expr = &exprs.data[assgns.data[item->idx].val];
 			struct assgn *assgn = &assgns.data[item->idx];
 			struct decl *decl = finddecl(assgn->s);
+			enum reg reg;
 			if (decl == NULL)
 				error(assgn->start->line, assgn->start->col, "unknown name");
 
@@ -519,7 +521,7 @@ genblock(char *buf, struct block *block, bool toplevel)
 			switch (expr->class) {
 			case C_INT:
 				// this is sort of an optimization, since we write at compile-time instead of evaluating and storing. should this happen here in the long term?
-				enum reg reg = getreg();
+				reg = getreg();
 				total += genexpr(buf ? buf + total : NULL, assgn->val, reg);
 				total += decl_fromreg(buf ? buf + total : NULL, decl, reg);
 				freereg(reg);

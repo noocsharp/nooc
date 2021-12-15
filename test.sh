@@ -14,4 +14,8 @@ do
 		printf "test %s failed\n" "$file"
 		exit 1
 	}
+	chmod +x out && ./out || {
+		printf "test %s failed\n" "$file"
+		exit 1
+	}
 done
