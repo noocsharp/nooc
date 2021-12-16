@@ -309,69 +309,9 @@ paramoffset(struct nametypes *params, struct nametype *nametype)
 	return offset + 8;
 }
 
-size_t
-genexpr(char *buf, size_t idx, enum reg reg)
-{
-	size_t len = 0;
-	char *ptr = buf;
-	struct expr *expr = &exprs.data[idx];
-
-	if (expr->kind == EXPR_LIT) {
-		switch (expr->class) {
-		case C_INT:
-			len = mov_r64_imm(ptr ? ptr + len : ptr, reg, expr->d.v.v.i);
-			break;
-		case C_STR: {
-			int addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
-			len = mov_r64_imm(ptr ? ptr + len : ptr, reg, addr);
-			break;
-		}
-		default:
-			error(expr->start->line, expr->start->col, "genexpr: unknown value type!");
-		}
-	} else if (expr->kind == EXPR_BINARY) {
-		len += genexpr(ptr ? ptr + len : ptr, expr->left, reg);
-		enum reg rreg = getreg();
-		len += genexpr(ptr ? ptr + len : ptr, expr->right, rreg);
-
-		switch (expr->d.op) {
-		case OP_PLUS: {
-			len += add_r64_r64(ptr ? ptr + len : ptr, reg, rreg);
-			break;
-		}
-		case OP_MINUS: {
-			len += sub_r64_r64(ptr ? ptr + len : ptr, reg, rreg);
-			break;
-		}
-		case OP_GREATER: {
-			len += cmp_r64_r64(ptr ? ptr + len : ptr, reg, rreg);
-			break;
-		}
-		default:
-			error(expr->start->line, expr->start->col, "genexpr: unknown binary op!");
-		}
-		freereg(rreg);
-	} else if (expr->kind == EXPR_IDENT) {
-		struct decl *decl = finddecl(expr->d.s);
-		if (decl != NULL) {
-			len += decl_toreg(ptr ? ptr + len : NULL, reg, decl);
-			return len;
-		}
-
-		struct nametype *param = findparam(&curproc->params, expr->d.s);
-		if (param != NULL) {
-			// calculate offset
-			int8_t offset = paramoffset(&curproc->params, param);
-			len += mov_disp8_m64_r64(buf ? buf + len : NULL, reg, offset, RBP);
-			return len;
-		}
-
-		error(expr->start->line, expr->start->col, "genexpr: unknown name '%.*s'", expr->d.s.len, expr->d.s.data);
-	} else {
-		error(expr->start->line, expr->start->col, "genexpr: could not generate code for expression");
-	}
-	return len;
-}
+size_t genexpr(char *buf, size_t idx, enum reg reg);
+size_t genproc(char *buf, struct proc *proc);
+size_t genblock(char *buf, struct block *block, bool toplevel);
 
 size_t
 gencall(char *buf, size_t addr, struct expr *expr)
@@ -397,7 +337,7 @@ gencall(char *buf, size_t addr, struct expr *expr)
 }
 
 size_t
-gensyscall(char *buf, struct expr *expr)
+gensyscall(char *buf, struct expr *expr, enum reg reg)
 {
 	unsigned short pushed = 0;
 	size_t len = 0;
@@ -422,9 +362,11 @@ gensyscall(char *buf, struct expr *expr)
 	}
 
 	len += 2;
+	if (reg != RAX)
+		len += mov_r64_r64(buf ? buf + len : NULL, reg, RAX);
 
 	for (int i = params->len - 1; i >= 0; i--) {
-		if (pushed & (1 << abi_arg[i])) {
+		if (pushed & (1 << abi_arg[i]) && abi_arg[i] != reg) {
 			len += pop_r64(buf ? buf + len : NULL, abi_arg[i]);
 		} else {
 			freereg(abi_arg[i]);
@@ -434,7 +376,102 @@ gensyscall(char *buf, struct expr *expr)
 	return len;
 }
 
-size_t genproc(char *buf, struct proc *proc);
+size_t
+genexpr(char *buf, size_t idx, enum reg reg)
+{
+	size_t total = 0;
+	struct expr *expr = &exprs.data[idx];
+
+	if (expr->kind == EXPR_LIT) {
+		switch (expr->class) {
+		case C_INT:
+			total = mov_r64_imm(buf ? buf + total : buf, reg, expr->d.v.v.i);
+			break;
+		case C_STR: {
+			int addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
+			total = mov_r64_imm(buf ? buf + total : buf, reg, addr);
+			break;
+		}
+		default:
+			error(expr->start->line, expr->start->col, "genexpr: unknown value type!");
+		}
+	} else if (expr->kind == EXPR_BINARY) {
+		total += genexpr(buf ? buf + total : buf, expr->left, reg);
+		enum reg rreg = getreg();
+		total += genexpr(buf ? buf + total : buf, expr->right, rreg);
+
+		switch (expr->d.op) {
+		case OP_PLUS: {
+			total += add_r64_r64(buf ? buf + total : buf, reg, rreg);
+			break;
+		}
+		case OP_MINUS: {
+			total += sub_r64_r64(buf ? buf + total : buf, reg, rreg);
+			break;
+		}
+		case OP_GREATER: {
+			total += cmp_r64_r64(buf ? buf + total : buf, reg, rreg);
+			break;
+		}
+		default:
+			error(expr->start->line, expr->start->col, "genexpr: unknown binary op!");
+		}
+		freereg(rreg);
+	} else if (expr->kind == EXPR_IDENT) {
+		struct decl *decl = finddecl(expr->d.s);
+		if (decl != NULL) {
+			total += decl_toreg(buf ? buf + total : NULL, reg, decl);
+			return total;
+		}
+
+		struct nametype *param = findparam(&curproc->params, expr->d.s);
+		if (param != NULL) {
+			// calculate offset
+			int8_t offset = paramoffset(&curproc->params, param);
+			total += mov_disp8_m64_r64(buf ? buf + total : NULL, reg, offset, RBP);
+			return total;
+		}
+
+		error(expr->start->line, expr->start->col, "genexpr: unknown name '%.*s'", expr->d.s.len, expr->d.s.data);
+	} else if (expr->kind == EXPR_FCALL) {
+		if (slice_cmplit(&expr->d.call.name, "syscall") == 0) {
+			total += gensyscall(buf ? buf + total : NULL, expr, reg);
+		} else {
+			struct decl *decl = finddecl(expr->d.call.name);
+			if (decl == NULL) {
+				error(expr->start->line, expr->start->col, "unknown function!");
+			}
+
+			total += gencall(buf ? buf + total : NULL, decl->loc.addr, expr);
+		}
+	} else if (expr->kind == EXPR_COND) {
+		struct expr *binary = &exprs.data[expr->d.cond.cond];
+		// FIXME this should go away
+		assert(binary->kind == EXPR_BINARY);
+		enum reg reg = getreg();
+		total += genexpr(buf ? buf + total : NULL, expr->d.cond.cond, reg);
+		freereg(reg);
+		size_t iflen = genblock(NULL, &expr->d.cond.bif, false) + jmp(NULL, 0);
+		size_t elselen = genblock(NULL, &expr->d.cond.belse, false);
+		switch (binary->d.op) {
+		case OP_GREATER:
+			total += jng(buf ? buf + total : NULL, iflen);
+			break;
+		default:
+			error(expr->start->line, expr->start->col, "unknown binop for conditional");
+		}
+		total += genblock(buf ? buf + total : NULL, &expr->d.cond.bif, false);
+		total += jmp(buf ? buf + total: NULL, elselen);
+		total += genblock(buf ? buf + total : NULL, &expr->d.cond.belse, false);
+	} else if (expr->kind == EXPR_LOOP) {
+		size_t back = genblock(NULL, &expr->d.loop.block, false) + jmp(NULL, 0);
+		total += genblock(buf ? buf + total : NULL, &expr->d.loop.block, false);
+		total += jmp(buf ? buf + total: NULL, -back);
+	} else {
+		error(expr->start->line, expr->start->col, "genexpr: could not generate code for expression");
+	}
+	return total;
+}
 
 // FIXME: It is not ideal to calculate length by doing all the calculations to generate instruction, before we actually write the instructions.
 size_t
@@ -445,81 +482,28 @@ genblock(char *buf, struct block *block, bool toplevel)
 	for (int i = 0; i < block->len; i++) {
 		struct item *item = &block->data[i];
 		if (item->kind == ITEM_EXPR) {
-			struct expr *expr = &exprs.data[item->idx];
-			if (expr->kind == EXPR_FCALL) {
-				if (slice_cmplit(&expr->d.call.name, "syscall") == 0) {
-					total += gensyscall(buf ? buf + total : NULL, expr);
-				} else {
-					struct decl *decl = finddecl(expr->d.call.name);
-					if (decl == NULL) {
-						error(expr->start->line, expr->start->col, "unknown function!");
-					}
-
-					total += gencall(buf ? buf + total : NULL, decl->loc.addr, expr);
-				}
-
-			} else if (expr->kind == EXPR_COND) {
-				struct expr *binary = &exprs.data[expr->d.cond.cond];
-				// FIXME this should go away
-				assert(binary->kind == EXPR_BINARY);
-				enum reg reg = getreg();
-				total += genexpr(buf ? buf + total : NULL, expr->d.cond.cond, reg);
-				freereg(reg);
-				size_t iflen = genblock(NULL, &expr->d.cond.bif, false) + jmp(NULL, 0);
-				size_t elselen = genblock(NULL, &expr->d.cond.belse, false);
-				switch (binary->d.op) {
-				case OP_GREATER:
-					total += jng(buf ? buf + total : NULL, iflen);
-					break;
-				default:
-					error(expr->start->line, expr->start->col, "unknown binop for conditional");
-				}
-				total += genblock(buf ? buf + total : NULL, &expr->d.cond.bif, false);
-				total += jmp(buf ? buf + total: NULL, elselen);
-				total += genblock(buf ? buf + total : NULL, &expr->d.cond.belse, false);
-			} else if (expr->kind == EXPR_LOOP) {
-				size_t back = genblock(NULL, &expr->d.loop.block, false) + jmp(NULL, 0);
-				total += genblock(buf ? buf + total : NULL, &expr->d.loop.block, false);
-				total += jmp(buf ? buf + total: NULL, -back);
-			} else {
-				error(expr->start->line, expr->start->col, "unhandled toplevel expression type!");
-			}
+			enum reg reg = getreg();
+			total += genexpr(buf ? buf + total : NULL, item->idx, reg);
+			freereg(reg);
 		} else if (item->kind == ITEM_DECL) {
 			struct decl *decl = &block->decls.data[item->idx];
 			struct expr *expr = &exprs.data[decl->val];
-			uint64_t addr;
 			enum reg reg;
 
 			decl->kind = toplevel ? DECL_DATA : DECL_STACK;
 			decl_alloc(block, decl);
 
-			switch (expr->class) {
-			case C_INT:
-				reg = getreg();
-				// FIXME: we can store literals at compile time
-				total += genexpr(buf ? buf + total : NULL, block->decls.data[item->idx].val, reg);
-				total += decl_fromreg(buf ? buf + total : NULL, decl, reg);
-				freereg(reg);
-				break;
-			// FIXME: we assume that any string is a literal, may break if we add binary operands on strings in the future.
-			case C_STR:
-				reg = getreg();
-				if (buf) {
-					addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
-				}
-				total += mov_r64_imm(buf ? buf + total : NULL, reg, addr);
-				total += decl_fromreg(buf ? buf + total : NULL, decl, reg);
-				freereg(reg);
-				break;
-			case C_PROC:
+			if (expr->class == C_PROC) {
 				block->decls.data[item->idx].loc.addr = total + TEXT_OFFSET;
 				// FIXME: won't work for nested functions
 				curproc = &expr->d.proc;
 				total += genproc(buf ? buf + total : NULL, &(expr->d.proc));
 				curproc = NULL;
-				break;
-			default:
-				error(expr->start->line, expr->start->col, "cannot generate code for unknown expression class");
+			} else {
+				reg = getreg();
+				total += genexpr(buf ? buf + total : NULL, block->decls.data[item->idx].val, reg);
+				total += decl_fromreg(buf ? buf + total : NULL, decl, reg);
+				freereg(reg);
 			}
 
 			decl->declared = true;
