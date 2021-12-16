@@ -452,6 +452,7 @@ genblock(char *buf, struct block *block, bool toplevel)
 				assert(binary->kind == EXPR_BINARY);
 				enum reg reg = getreg();
 				total += genexpr(buf ? buf + total : NULL, expr->d.cond.cond, reg);
+				freereg(reg);
 				size_t iflen = genblock(NULL, &expr->d.cond.bif, false) + jmp(NULL, 0);
 				size_t elselen = genblock(NULL, &expr->d.cond.belse, false);
 				switch (binary->d.op) {
@@ -475,24 +476,28 @@ genblock(char *buf, struct block *block, bool toplevel)
 			struct decl *decl = &block->decls.data[item->idx];
 			struct expr *expr = &exprs.data[decl->val];
 			uint64_t addr;
-			enum reg reg = getreg();
+			enum reg reg;
 
 			decl->kind = toplevel ? DECL_DATA : DECL_STACK;
 			decl_alloc(block, decl);
 
 			switch (expr->class) {
 			case C_INT:
+				reg = getreg();
 				// FIXME: we can store literals at compile time
 				total += genexpr(buf ? buf + total : NULL, block->decls.data[item->idx].val, reg);
 				total += decl_fromreg(buf ? buf + total : NULL, decl, reg);
+				freereg(reg);
 				break;
 			// FIXME: we assume that any string is a literal, may break if we add binary operands on strings in the future.
 			case C_STR:
+				reg = getreg();
 				if (buf) {
 					addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
 				}
 				total += mov_r64_imm(buf ? buf + total : NULL, reg, addr);
 				total += decl_fromreg(buf ? buf + total : NULL, decl, reg);
+				freereg(reg);
 				break;
 			case C_PROC:
 				block->decls.data[item->idx].loc.addr = total + TEXT_OFFSET;
@@ -506,7 +511,6 @@ genblock(char *buf, struct block *block, bool toplevel)
 			}
 
 			decl->declared = true;
-			freereg(reg);
 		} else if (item->kind == ITEM_ASSGN) {
 			struct expr *expr = &exprs.data[assgns.data[item->idx].val];
 			struct assgn *assgn = &assgns.data[item->idx];
