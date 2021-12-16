@@ -319,11 +319,11 @@ genexpr(char *buf, size_t idx, enum reg reg)
 	if (expr->kind == EXPR_LIT) {
 		switch (expr->class) {
 		case C_INT:
-			len = mov_r_imm(ptr ? ptr + len : ptr, reg, expr->d.v.v.i);
+			len = mov_r64_imm(ptr ? ptr + len : ptr, reg, expr->d.v.v.i);
 			break;
 		case C_STR: {
 			int addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
-			len = mov_r_imm(ptr ? ptr + len : ptr, reg, addr);
+			len = mov_r64_imm(ptr ? ptr + len : ptr, reg, addr);
 			break;
 		}
 		default:
@@ -388,7 +388,7 @@ gencall(char *buf, size_t addr, struct expr *expr)
 		len += push_r64(buf ? buf + len : NULL, reg);
 	}
 
-	len += mov_r_imm(buf ? buf + len : NULL, reg, addr);
+	len += mov_r64_imm(buf ? buf + len : NULL, reg, addr);
 	len += call(buf ? buf + len : NULL, reg);
 
 	freereg(reg);
@@ -491,7 +491,7 @@ genblock(char *buf, struct block *block, bool toplevel)
 				if (buf) {
 					addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
 				}
-				total += mov_r_imm(buf ? buf + total : NULL, reg, addr);
+				total += mov_r64_imm(buf ? buf + total : NULL, reg, addr);
 				total += decl_fromreg(buf ? buf + total : NULL, decl, reg);
 				break;
 			case C_PROC:
@@ -529,7 +529,7 @@ genblock(char *buf, struct block *block, bool toplevel)
 			// FIXME: we assume that any string is a literal, may break if we add binary operands on strings in the future.
 			case C_STR:
 				size_t addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
-				total += mov_r_imm(buf ? buf + total : NULL, reg, addr);
+				total += mov_r64_imm(buf ? buf + total : NULL, reg, addr);
 				total += decl_fromreg(buf ? buf + total : NULL, decl, reg);
 				break;
 			default:

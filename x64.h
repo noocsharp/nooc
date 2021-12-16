@@ -17,13 +17,6 @@ enum reg {
 	R15,
 };
 
-enum mod {
-	MOD_INDIRECT,
-	MOD_DISP8,
-	MOD_DISP32,
-	MOD_DIRECT
-};
-
 extern char abi_arg[];
 extern unsigned short used_reg;
 
@@ -31,8 +24,8 @@ void clearreg();
 enum reg getreg();
 void freereg(enum reg reg);
 
-size_t add_r_imm(char *buf, enum reg reg, uint64_t imm);
-size_t mov_r_imm(char *buf, enum reg reg, uint64_t imm);
+size_t add_r64_imm(char *buf, enum reg reg, uint64_t imm);
+size_t mov_r64_imm(char *buf, enum reg reg, uint64_t imm);
 size_t mov_r64_m64(char *buf, enum reg reg, uint64_t addr);
 size_t mov_m64_r64(char *buf, uint64_t addr, enum reg reg);
 size_t mov_r64_r64(char *buf, enum reg dest, enum reg src);

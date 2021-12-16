@@ -8,6 +8,20 @@
 #include "x64.h"
 #include "util.h"
 
+enum rex {
+	REX_B = 0x41,
+	REX_X = 0x42,
+	REX_R = 0x44,
+	REX_W = 0x48,
+};
+
+enum mod {
+	MOD_INDIRECT,
+	MOD_DISP8,
+	MOD_DISP32,
+	MOD_DIRECT
+};
+
 char abi_arg[] = {RAX, RDI, RSI, RDX, R10, R8, R9};
 unsigned short used_reg;
 
@@ -38,14 +52,12 @@ freereg(enum reg reg)
 }
 
 size_t
-add_r_imm(char *buf, enum reg reg, uint64_t imm)
+add_r64_imm(char *buf, enum reg dest, uint64_t imm)
 {
-	uint8_t mov[] = {0x48, 0x81};
-	uint8_t op1 = (MOD_DIRECT << 6) | reg;
 	if (buf) {
-		memcpy(buf, mov, 2);
-		buf += 2;
-		*(buf++) = op1;
+		*(buf++) = REX_W;
+		*(buf++) = 0x81;;
+		*(buf++) = (MOD_DIRECT << 6) | dest;
 		*(buf++) = imm & 0xFF;
 		*(buf++) = (imm >> 8) & 0xFF;
 		*(buf++) = (imm >> 16) & 0xFF;
@@ -56,14 +68,12 @@ add_r_imm(char *buf, enum reg reg, uint64_t imm)
 }
 
 size_t
-mov_r_imm(char *buf, enum reg reg, uint64_t imm)
+mov_r64_imm(char *buf, enum reg dest, uint64_t imm)
 {
-	uint8_t mov[] = {0x48, 0xc7};
-	uint8_t op1 = (MOD_DIRECT << 6) | reg;
 	if (buf) {
-		memcpy(buf, mov, 2);
-		buf += 2;
-		*(buf++) = op1;
+		*(buf++) = REX_W;
+		*(buf++) = 0xc7;
+		*(buf++) = (MOD_DIRECT << 6) | dest;
 		*(buf++) = imm & 0xFF;
 		*(buf++) = (imm >> 8) & 0xFF;
 		*(buf++) = (imm >> 16) & 0xFF;
@@ -74,15 +84,13 @@ mov_r_imm(char *buf, enum reg reg, uint64_t imm)
 }
 
 size_t
-mov_r64_m64(char *buf, enum reg reg, uint64_t addr)
+mov_r64_m64(char *buf, enum reg dest, uint64_t addr)
 {
-	uint8_t mov[] = {0x48, 0x8b};
-	uint8_t op1 = (MOD_INDIRECT << 6) | (reg << 3) | 4;
 	uint8_t sib = 0x25;
 	if (buf) {
-		memcpy(buf, mov, 2);
-		buf += 2;
-		*(buf++) = op1;
+		*(buf++) = REX_W;
+		*(buf++) = 0x8b;
+		*(buf++) = (MOD_INDIRECT << 6) | (dest << 3) | 4;
 		*(buf++) = sib;
 		*(buf++) = addr & 0xFF;
 		*(buf++) = (addr >> 8) & 0xFF;
@@ -94,15 +102,13 @@ mov_r64_m64(char *buf, enum reg reg, uint64_t addr)
 }
 
 size_t
-mov_m64_r64(char *buf, uint64_t addr, enum reg reg)
+mov_m64_r64(char *buf, uint64_t addr, enum reg src)
 {
-	uint8_t mov[] = {0x48, 0x89};
-	uint8_t op1 = (MOD_INDIRECT << 6) | (reg << 3) | 4;
 	uint8_t sib = 0x25;
 	if (buf) {
-		memcpy(buf, mov, 2);
-		buf += 2;
-		*(buf++) = op1;
+		*(buf++) = REX_W;
+		*(buf++) = 0x89;
+		*(buf++) = (MOD_INDIRECT << 6) | (src << 3) | 4;
 		*(buf++) = sib;
 		*(buf++) = addr & 0xFF;
 		*(buf++) = (addr >> 8) & 0xFF;
@@ -116,12 +122,10 @@ mov_m64_r64(char *buf, uint64_t addr, enum reg reg)
 size_t
 mov_r64_r64(char *buf, enum reg dest, enum reg src)
 {
-	uint8_t mov[] = {0x48, 0x89};
-	uint8_t op1 = (MOD_DIRECT << 6) | (src << 3) | dest;
 	if (buf) {
-		memcpy(buf, mov, 2);
-		buf += 2;
-		*(buf++) = op1;
+		*(buf++) = REX_W;
+		*(buf++) = 0x89;
+		*(buf++) = (MOD_DIRECT << 6) | (src << 3) | dest;
 	}
 
 	return 3;
@@ -130,11 +134,10 @@ mov_r64_r64(char *buf, enum reg dest, enum reg src)
 size_t
 mov_disp8_m64_r64(char *buf, enum reg dest, int8_t disp, enum reg src)
 {
-	uint8_t mov[] = {0x48, 0x89};
 	assert(src != 4);
 	if (buf) {
-		memcpy(buf, mov, 2);
-		buf += 2;
+		*(buf++) = REX_W;
+		*(buf++) = 0x89;
 		*(buf++) = (MOD_DISP8 << 6) | (dest << 3) | src;
 		*(buf++) = disp;
 	}
@@ -145,11 +148,10 @@ mov_disp8_m64_r64(char *buf, enum reg dest, int8_t disp, enum reg src)
 size_t
 mov_disp8_r64_m64(char *buf, enum reg dest, enum reg src, int8_t disp)
 {
-	uint8_t mov[] = {0x48, 0x8b};
 	assert(src != 4);
 	if (buf) {
-		memcpy(buf, mov, 2);
-		buf += 2;
+		*(buf++) = REX_W;
+		*(buf++) = 0x8b;
 		*(buf++) = (MOD_DISP8 << 6) | (dest << 3) | src;
 		*(buf++) = disp;
 	}
@@ -158,28 +160,24 @@ mov_disp8_r64_m64(char *buf, enum reg dest, enum reg src, int8_t disp)
 }
 
 size_t
-add_r64_r64(char *buf, enum reg reg1, enum reg reg2)
+add_r64_r64(char *buf, enum reg dest, enum reg src)
 {
-	uint8_t mov[] = {0x48, 0x03};
-	uint8_t op = (MOD_DIRECT << 6) | (reg1 << 3) | reg2;
 	if (buf) {
-		memcpy(buf, mov, 2);
-		buf += 2;
-		*(buf++) = op;
+		*(buf++) = REX_W;
+		*(buf++) = 0x03;
+		*(buf++) = (MOD_DIRECT << 6) | (dest << 3) | src;
 	}
 
 	return 3;
 }
 
 size_t
-sub_r64_r64(char *buf, enum reg reg1, enum reg reg2)
+sub_r64_r64(char *buf, enum reg dest, enum reg src)
 {
-	uint8_t mov[] = {0x48, 0x2B};
-	uint8_t op = (MOD_DIRECT << 6) | (reg1 << 3) | reg2;
 	if (buf) {
-		memcpy(buf, mov, 2);
-		buf += 2;
-		*(buf++) = op;
+		*(buf++) = REX_W;
+		*(buf++) = 0x2b;
+		*(buf++) = (MOD_DIRECT << 6) | (dest << 3) | src;
 	}
 
 	return 3;
@@ -188,12 +186,10 @@ sub_r64_r64(char *buf, enum reg reg1, enum reg reg2)
 size_t
 sub_r64_imm(char *buf, enum reg dest, int32_t imm)
 {
-	uint8_t mov[] = {0x48, 0x81};
-	uint8_t op1 = (MOD_DIRECT << 6) | (5 << 3) | dest;
 	if (buf) {
-		memcpy(buf, mov, 2);
-		buf += 2;
-		*(buf++) = op1;
+		*(buf++) = REX_W;
+		*(buf++) = 0x81;
+		*(buf++) = (MOD_DIRECT << 6) | (5 << 3) | dest;
 		*(buf++) = imm & 0xFF;
 		*(buf++) = (imm >> 8) & 0xFF;
 		*(buf++) = (imm >> 16) & 0xFF;
@@ -206,12 +202,10 @@ sub_r64_imm(char *buf, enum reg dest, int32_t imm)
 size_t
 cmp_r64_r64(char *buf, enum reg reg1, enum reg reg2)
 {
-	uint8_t mov[] = {0x48, 0x3B};
-	uint8_t op = (MOD_DIRECT << 6) | (reg1 << 3) | reg2;
 	if (buf) {
-		memcpy(buf, mov, 2);
-		buf += 2;
-		*(buf++) = op;
+		*(buf++) = REX_W;
+		*(buf++) = 0x3b;
+		*(buf++) = (MOD_DIRECT << 6) | (reg1 << 3) | reg2;
 	}
 
 	return 3;
@@ -282,9 +276,8 @@ call(char *buf, enum reg reg)
 size_t
 ret(char *buf)
 {
-	if (buf) {
-		*(buf++) = 0xC3;
-	}
+	if (buf)
+		*buf = 0xC3;
 
 	return 1;
 }
@@ -292,13 +285,15 @@ ret(char *buf)
 size_t push_r64(char *buf, enum reg reg)
 {
 	if (buf)
-		*(buf++) = 0x50 + reg;
+		*buf = 0x50 + reg;
+
 	return 1;
 }
 
 size_t pop_r64(char *buf, enum reg reg)
 {
 	if (buf)
-		*(buf++) = 0x58 + reg;
+		*buf = 0x58 + reg;
+
 	return 1;
 }
