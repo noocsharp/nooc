@@ -399,6 +399,7 @@ gencall(char *buf, size_t addr, struct expr *expr)
 size_t
 gensyscall(char *buf, struct expr *expr)
 {
+	unsigned short pushed = 0;
 	size_t len = 0;
 	struct fparams *params = &expr->d.call.params;
 	if (params->len > 7)
@@ -406,18 +407,29 @@ gensyscall(char *buf, struct expr *expr)
 
 	// encoding for argument registers in ABI order
 	for (int i = 0; i < params->len; i++) {
-		used_reg |= (1 << abi_arg[i]);
+		if (used_reg & (1 << abi_arg[i])) {
+			len += push_r64(buf ? buf + len : NULL, abi_arg[i]);
+			pushed |= (1 << abi_arg[i]);
+		} else {
+			used_reg |= (1 << abi_arg[i]);
+		}
 		len += genexpr(buf ? buf + len : NULL, params->data[i], abi_arg[i]);
 	}
-
-	// FIXME: what if an abi arg register has already been allocated before this executes? (ex. nested function call)
-	clearreg();
 
 	if (buf) {
 		char syscall[] = {0x0f, 0x05};
 		memcpy(buf + len, syscall, 2);
 	}
+
 	len += 2;
+
+	for (int i = params->len - 1; i >= 0; i--) {
+		if (pushed & (1 << abi_arg[i])) {
+			len += pop_r64(buf ? buf + len : NULL, abi_arg[i]);
+		} else {
+			freereg(abi_arg[i]);
+		}
+	}
 
 	return len;
 }
