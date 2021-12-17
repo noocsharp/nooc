@@ -1,8 +1,8 @@
-let exit proc = proc(code i64) {
+let exit proc() = proc(code i64) {
 	syscall(60, code)
 	return
 }
 
-let main proc = proc {
+let main proc() = proc() {
 	exit(0)
 }

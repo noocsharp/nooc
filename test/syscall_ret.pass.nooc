@@ -1,4 +1,4 @@
-let main proc = proc {
+let main proc() = proc() {
 	let ret i64 = syscall(1, 1, "syscall_ret", 11)
 	if > ret 0 {
 		syscall(60, 0)

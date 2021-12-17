@@ -1,9 +1,9 @@
-let hello proc = proc {
+let hello proc() = proc() {
 	syscall(1, 1, "hello\n", 6)
 	return
 }
 
-let main proc = proc {
+let main proc() = proc() {
 	hello()
 	syscall(60, 0)
 }

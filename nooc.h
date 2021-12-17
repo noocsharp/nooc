@@ -69,7 +69,10 @@ struct type {
 	enum typeclass class;
 	size_t size;
 	union {
-		struct typelist typelist;
+		struct {
+			struct typelist in;
+			struct typelist out;
+		} params;
 	} d;
 };
 
@@ -164,7 +167,8 @@ struct loop {
 };
 
 struct proc {
-	struct nametypes params;
+	struct nametypes in;
+	struct nametypes out;
 	struct block block;
 };
 

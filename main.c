@@ -161,7 +161,7 @@ dumpval(struct expr *e)
 		fprintf(stderr, "\"%.*s\"", (int)e->d.v.v.s.len, e->d.v.v.s.data);
 		break;
 	case C_PROC:
-		fprintf(stderr, "proc with %lu params", e->d.proc.params.len);
+		fprintf(stderr, "proc with %lu params", e->d.proc.in.len);
 		break;
 	}
 }
@@ -247,11 +247,11 @@ typecheck(struct block items)
 				if (expr->class != C_PROC)
 					error(decl->start->line, decl->start->col, "expected proc expression for proc declaration");
 
-				if (expr->d.proc.params.len != type->d.typelist.len)
-					error(decl->start->line, decl->start->col, "procedure expression takes %u parameters, but declaration has type which takes %u", expr->d.proc.params.len, type->d.typelist.len);
+				if (expr->d.proc.in.len != type->d.params.in.len)
+					error(decl->start->line, decl->start->col, "procedure expression takes %u parameters, but declaration has type which takes %u", expr->d.proc.in.len, type->d.params.in.len);
 
-				for (size_t j = 0; j < expr->d.proc.params.len; j++) {
-					if (expr->d.proc.params.data[j].type != type->d.typelist.data[j])
+				for (size_t j = 0; j < expr->d.proc.in.len; j++) {
+					if (expr->d.proc.in.data[j].type != type->d.params.in.data[j])
 						error(decl->start->line, decl->start->col, "unexpected type for parameter %u in procedure declaration", j);
 				}
 				break;
@@ -424,10 +424,10 @@ genexpr(char *buf, size_t idx, enum reg reg)
 			return total;
 		}
 
-		struct nametype *param = findparam(&curproc->params, expr->d.s);
+		struct nametype *param = findparam(&curproc->in, expr->d.s);
 		if (param != NULL) {
 			// calculate offset
-			int8_t offset = paramoffset(&curproc->params, param);
+			int8_t offset = paramoffset(&curproc->in, param);
 			total += mov_disp8_m64_r64(buf ? buf + total : NULL, reg, offset, RBP);
 			return total;
 		}

@@ -63,7 +63,8 @@ hashtype(struct type *type, uint8_t *out)
 	blake3_update(&b3, &type->class, sizeof(enum typeclass));
 	switch (type->class) {
 	case TYPE_PROC:
-		blake3_update(&b3, type->d.typelist.data, type->d.typelist.len * sizeof(*type->d.typelist.data));
+		blake3_update(&b3, type->d.params.in.data, type->d.params.in.len * sizeof(*type->d.params.in.data));
+		blake3_update(&b3, type->d.params.out.data, type->d.params.out.len * sizeof(*type->d.params.out.data));
 	default:
 	}
 

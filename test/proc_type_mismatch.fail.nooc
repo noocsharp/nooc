@@ -3,6 +3,6 @@ let exit proc(str) = proc(code i64) {
 	return
 }
 
-let main proc = proc {
+let main proc() = proc() {
 	exit(0)
 }

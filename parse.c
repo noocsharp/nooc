@@ -26,6 +26,7 @@ extern struct map *typesmap;
 struct token *tok;
 
 static void parsenametypes(struct nametypes *nametypes);
+static size_t parsetype();
 
 struct decl *
 finddecl(struct slice s)
@@ -105,7 +106,7 @@ parsestring(struct expr *expr)
 static struct block parseblock();
 
 static size_t
-parseexpr()
+parseexpr(struct block *block)
 {
 	struct expr expr = { 0 };
 	switch (tok->type) {
@@ -119,7 +120,7 @@ parseexpr()
 		expr.start = tok;
 		expr.kind = EXPR_COND;
 		tok = tok->next;
-		expr.d.cond.cond = parseexpr();
+		expr.d.cond.cond = parseexpr(block);
 		expr.d.cond.bif = parseblock();
 		if (tok->type == TOK_ELSE) {
 			tok = tok->next;
@@ -128,7 +129,7 @@ parseexpr()
 		break;
 	case TOK_LPAREN:
 		tok = tok->next;
-		size_t ret = parseexpr();
+		size_t ret = parseexpr(block);
 		expect(TOK_RPAREN);
 		tok = tok->next;
 		return ret;
@@ -137,12 +138,34 @@ parseexpr()
 		expr.start = tok;
 		// a procedure definition
 		if (slice_cmplit(&tok->slice, "proc") == 0) {
+			struct decl decl = { 0 };
+			struct type *type;
+			int8_t offset = 0;
 			expr.kind = EXPR_PROC;
 			expr.class = C_PROC;
 			tok = tok->next;
+			parsenametypes(&expr.d.proc.in);
 			if (tok->type == TOK_LPAREN)
-				parsenametypes(&expr.d.proc.params);
+				parsenametypes(&expr.d.proc.out);
 			expr.d.proc.block = parseblock();
+			for (size_t i = 0; i < expr.d.proc.in.len; i++) {
+				decl.s = expr.d.proc.in.data[i].name;
+				decl.type = expr.d.proc.in.data[i].type;
+				type = &types.data[decl.type];
+				offset += type->size;
+				decl.loc.off = offset;
+				array_add((&block->decls), decl);
+			}
+
+			for (size_t i = 0; i < expr.d.proc.out.len; i++) {
+				decl.s = expr.d.proc.out.data[i].name;
+				decl.type = expr.d.proc.out.data[i].type;
+				decl.declared = true;
+				type = &types.data[decl.type];
+				offset += type->size;
+				decl.loc.off = offset;
+				array_add((&block->decls), decl);
+			}
 		// a function call
 		} else if (tok->next && tok->next->type == TOK_LPAREN) {
 			size_t pidx;
@@ -151,7 +174,7 @@ parseexpr()
 			expr.kind = EXPR_FCALL;
 
 			while (tok->type != TOK_RPAREN) {
-				pidx = parseexpr();
+				pidx = parseexpr(block);
 				array_add((&expr.d.call.params), pidx);
 				if (tok->type == TOK_RPAREN)
 					break;
@@ -188,8 +211,8 @@ parseexpr()
 binary_common:
 		expr.start = tok;
 		tok = tok->next;
-		expr.left = parseexpr();
-		expr.right = parseexpr();
+		expr.left = parseexpr(block);
+		expr.right = parseexpr(block);
 		if (exprs.data[expr.left].class != exprs.data[expr.right].class)
 			error(tok->line, tok->col, "expected binary expression operands to be of same class");
 		expr.class = exprs.data[expr.left].class;
@@ -206,6 +229,29 @@ binary_common:
 	return exprs.len - 1;
 }
 
+void
+parsetypelist(struct typelist *list)
+{
+	expect(TOK_LPAREN);
+	tok = tok->next;
+	size_t type;
+
+	while (tok->type != TOK_RPAREN) {
+		expect(TOK_NAME);
+
+		type = parsetype();
+		array_add(list, type);
+
+		if (tok->type == TOK_RPAREN)
+			break;
+
+		expect(TOK_COMMA);
+		tok = tok->next;
+	}
+
+	tok = tok->next;
+}
+
 static size_t
 parsetype()
 {
@@ -214,26 +260,12 @@ parsetype()
 	union mapval val;
 
 	if (strncmp(tok->slice.data, "proc", 3) == 0) {
-		size_t subtype;
 		type.class = TYPE_PROC;
 		tok = tok->next;
-		if (tok->type == TOK_LPAREN) {
-			tok = tok->next;
-			while (tok->type != TOK_RPAREN) {
-				expect(TOK_NAME);
-				subtype = parsetype();
 
-				array_add((&type.d.typelist), subtype);
-
-				if (tok->type == TOK_RPAREN)
-					break;
-
-				expect(TOK_COMMA);
-				tok = tok->next;
-			}
-
-			tok = tok->next;
-		}
+		parsetypelist(&type.d.params.in);
+		if (tok->type == TOK_LPAREN)
+			parsetypelist(&type.d.params.out);
 	} else {
 		mapkey(&key, tok->slice.data, tok->slice.len);
 		val = mapget(typesmap, &key);
@@ -309,7 +341,7 @@ parseblock()
 				error(tok->line, tok->col, "repeat declaration!");
 			}
 
-			decl.val = parseexpr();
+			decl.val = parseexpr(&items);
 			array_add((&items.decls), decl);
 
 			item.idx = items.decls.len - 1;
@@ -325,14 +357,14 @@ parseblock()
 			assgn.s = tok->slice;
 
 			tok = tok->next->next;
-			assgn.val = parseexpr();
+			assgn.val = parseexpr(&items);
 			array_add((&assgns), assgn);
 
 			item.idx = assgns.len - 1;
 			array_add((&items), item);
 		} else {
 			item.kind = ITEM_EXPR;
-			item.idx = parseexpr();
+			item.idx = parseexpr(&items);
 			array_add((&items), item);
 		}
 	}
