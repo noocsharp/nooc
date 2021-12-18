@@ -126,6 +126,46 @@ decl_toreg(char *buf, enum reg reg, struct decl *decl)
 	return total;
 }
 
+size_t
+out_write(char *buf, struct out *out, enum reg reg)
+{
+	size_t total = 0;
+	switch (out->kind) {
+	case OUT_ADDR:
+		total += mov_mr64_r64(buf ? buf + total : buf, out->reg, reg);
+		break;
+	case OUT_REG:
+		total += mov_r64_r64(buf ? buf + total : buf, out->reg, reg);
+		break;
+	case OUT_IGNORE:
+		break;
+	default:
+		die("unhandled OUT_*");
+	}
+
+	return total;
+}
+
+size_t
+out_read(char *buf, enum reg reg, struct out *out)
+{
+	size_t total = 0;
+	switch (out->kind) {
+	case OUT_ADDR:
+		total += mov_r64_mr64(buf ? buf + total : buf, reg, out->reg);
+		break;
+	case OUT_REG:
+		total += mov_r64_r64(buf ? buf + total : buf, reg, out->reg);
+		break;
+	case OUT_IGNORE:
+		break;
+	default:
+		die("unhandled OUT_*");
+	}
+
+	return total;
+}
+
 struct block *curitems;
 
 char *exprkind_str(enum exprkind kind)
@@ -291,25 +331,7 @@ typecheck(struct block items)
 	}
 }
 
-
-// type must be in params - probably should come up with better interface
-ssize_t
-paramoffset(struct nametypes *params, struct nametype *nametype)
-{
-	ssize_t offset = 0;
-	struct type *type;
-	for (size_t i = params->len - 1; i >= 0; i--) {
-		type = &types.data[params->data[i].type];
-		offset += type->size;
-		if (&params->data[i] == nametype)
-			break;
-	}
-
-	// compensate for %rbp push onto stack
-	return offset + 8;
-}
-
-size_t genexpr(char *buf, size_t idx, enum reg reg);
+size_t genexpr(char *buf, size_t idx, struct out *out);
 size_t genproc(char *buf, struct proc *proc);
 size_t genblock(char *buf, struct block *block, bool toplevel);
 
@@ -321,27 +343,28 @@ gencall(char *buf, size_t addr, struct expr *expr)
 	if (params->len > 7)
 		error(expr->start->line, expr->start->col, "syscall can take at most 7 parameters");
 
-	enum reg reg = getreg();
+	struct out out = {OUT_REG, getreg()};
 
 	for (int i = 0; i < params->len; i++) {
-		len += genexpr(buf ? buf + len : NULL, params->data[i], reg);
-		len += push_r64(buf ? buf + len : NULL, reg);
+		len += genexpr(buf ? buf + len : NULL, params->data[i], &out);
+		len += push_r64(buf ? buf + len : NULL, out.reg);
 	}
 
-	len += mov_r64_imm(buf ? buf + len : NULL, reg, addr);
-	len += call(buf ? buf + len : NULL, reg);
+	len += mov_r64_imm(buf ? buf + len : NULL, out.reg, addr);
+	len += call(buf ? buf + len : NULL, out.reg);
 
-	freereg(reg);
+	freereg(out.reg);
 
 	return len;
 }
 
 size_t
-gensyscall(char *buf, struct expr *expr, enum reg reg)
+gensyscall(char *buf, struct expr *expr, struct out *out)
 {
 	unsigned short pushed = 0;
 	size_t len = 0;
 	struct fparams *params = &expr->d.call.params;
+	struct out tempout = { .kind = OUT_REG };
 	if (params->len > 7)
 		error(expr->start->line, expr->start->col, "syscall can take at most 7 parameters");
 
@@ -353,7 +376,8 @@ gensyscall(char *buf, struct expr *expr, enum reg reg)
 		} else {
 			used_reg |= (1 << abi_arg[i]);
 		}
-		len += genexpr(buf ? buf + len : NULL, params->data[i], abi_arg[i]);
+		tempout.reg = abi_arg[i];
+		len += genexpr(buf ? buf + len : NULL, params->data[i], &tempout);
 	}
 
 	if (buf) {
@@ -362,11 +386,10 @@ gensyscall(char *buf, struct expr *expr, enum reg reg)
 	}
 
 	len += 2;
-	if (reg != RAX)
-		len += mov_r64_r64(buf ? buf + len : NULL, reg, RAX);
+	len += out_write(buf ? buf + len : NULL, out, RAX);
 
 	for (int i = params->len - 1; i >= 0; i--) {
-		if (pushed & (1 << abi_arg[i]) && abi_arg[i] != reg) {
+		if (pushed & (1 << abi_arg[i]) && (out->kind != OUT_REG || abi_arg[i] != out->reg)) {
 			len += pop_r64(buf ? buf + len : NULL, abi_arg[i]);
 		} else {
 			freereg(abi_arg[i]);
@@ -377,65 +400,68 @@ gensyscall(char *buf, struct expr *expr, enum reg reg)
 }
 
 size_t
-genexpr(char *buf, size_t idx, enum reg reg)
+genexpr(char *buf, size_t idx, struct out *out)
 {
 	size_t total = 0;
 	struct expr *expr = &exprs.data[idx];
 
 	if (expr->kind == EXPR_LIT) {
+		enum reg reg = getreg();
 		switch (expr->class) {
 		case C_INT:
-			total = mov_r64_imm(buf ? buf + total : buf, reg, expr->d.v.v.i);
+			total += mov_r64_imm(buf ? buf + total : buf, reg, expr->d.v.v.i);
 			break;
 		case C_STR: {
 			int addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
-			total = mov_r64_imm(buf ? buf + total : buf, reg, addr);
+			total += mov_r64_imm(buf ? buf + total : buf, reg, addr);
 			break;
 		}
 		default:
 			error(expr->start->line, expr->start->col, "genexpr: unknown value type!");
 		}
+
+		total += out_write(buf ? buf + total : NULL, out, reg);
+		freereg(reg);
+
 	} else if (expr->kind == EXPR_BINARY) {
-		total += genexpr(buf ? buf + total : buf, expr->left, reg);
-		enum reg rreg = getreg();
-		total += genexpr(buf ? buf + total : buf, expr->right, rreg);
+		total += genexpr(buf ? buf + total : buf, expr->left, out);
+		struct out out2 = { OUT_REG, getreg() };
+		total += genexpr(buf ? buf + total : buf, expr->right, &out2);
+
+		enum reg reg = getreg();
+
+		total += out_read(buf ? buf + total : buf, reg, out);
 
 		switch (expr->d.op) {
 		case OP_PLUS: {
-			total += add_r64_r64(buf ? buf + total : buf, reg, rreg);
+			total += add_r64_r64(buf ? buf + total : buf, reg, out2.reg);
 			break;
 		}
 		case OP_MINUS: {
-			total += sub_r64_r64(buf ? buf + total : buf, reg, rreg);
+			total += sub_r64_r64(buf ? buf + total : buf, reg, out2.reg);
 			break;
 		}
 		case OP_GREATER: {
-			total += cmp_r64_r64(buf ? buf + total : buf, reg, rreg);
+			total += cmp_r64_r64(buf ? buf + total : buf, reg, out2.reg);
 			break;
 		}
 		default:
 			error(expr->start->line, expr->start->col, "genexpr: unknown binary op!");
 		}
-		freereg(rreg);
+		freereg(out2.reg);
+
+		freereg(reg);
 	} else if (expr->kind == EXPR_IDENT) {
 		struct decl *decl = finddecl(expr->d.s);
-		if (decl != NULL) {
-			total += decl_toreg(buf ? buf + total : NULL, reg, decl);
-			return total;
+		if (decl == NULL) {
+			error(expr->start->line, expr->start->col, "genexpr: unknown name '%.*s'", expr->d.s.len, expr->d.s.data);
 		}
+		total += decl_toreg(buf ? buf + total : NULL, out->reg, decl);
+		return total;
 
-		struct nametype *param = findparam(&curproc->in, expr->d.s);
-		if (param != NULL) {
-			// calculate offset
-			int8_t offset = paramoffset(&curproc->in, param);
-			total += mov_disp8_m64_r64(buf ? buf + total : NULL, reg, offset, RBP);
-			return total;
-		}
-
-		error(expr->start->line, expr->start->col, "genexpr: unknown name '%.*s'", expr->d.s.len, expr->d.s.data);
 	} else if (expr->kind == EXPR_FCALL) {
 		if (slice_cmplit(&expr->d.call.name, "syscall") == 0) {
-			total += gensyscall(buf ? buf + total : NULL, expr, reg);
+			total += gensyscall(buf ? buf + total : NULL, expr, out);
 		} else {
 			struct decl *decl = finddecl(expr->d.call.name);
 			if (decl == NULL) {
@@ -448,9 +474,9 @@ genexpr(char *buf, size_t idx, enum reg reg)
 		struct expr *binary = &exprs.data[expr->d.cond.cond];
 		// FIXME this should go away
 		assert(binary->kind == EXPR_BINARY);
-		enum reg reg = getreg();
-		total += genexpr(buf ? buf + total : NULL, expr->d.cond.cond, reg);
-		freereg(reg);
+		struct out tempout = {OUT_REG, getreg()};
+		total += genexpr(buf ? buf + total : NULL, expr->d.cond.cond, &tempout);
+		freereg(tempout.reg);
 		size_t iflen = genblock(NULL, &expr->d.cond.bif, false) + jmp(NULL, 0);
 		size_t elselen = genblock(NULL, &expr->d.cond.belse, false);
 		switch (binary->d.op) {
@@ -482,13 +508,11 @@ genblock(char *buf, struct block *block, bool toplevel)
 	for (int i = 0; i < block->len; i++) {
 		struct item *item = &block->data[i];
 		if (item->kind == ITEM_EXPR) {
-			enum reg reg = getreg();
-			total += genexpr(buf ? buf + total : NULL, item->idx, reg);
-			freereg(reg);
+			struct out tempout = {OUT_IGNORE};
+			total += genexpr(buf ? buf + total : NULL, item->idx, &tempout);
 		} else if (item->kind == ITEM_DECL) {
 			struct decl *decl = &block->decls.data[item->idx];
 			struct expr *expr = &exprs.data[decl->val];
-			enum reg reg;
 
 			decl->kind = toplevel ? DECL_DATA : DECL_STACK;
 			decl_alloc(block, decl);
@@ -500,10 +524,10 @@ genblock(char *buf, struct block *block, bool toplevel)
 				total += genproc(buf ? buf + total : NULL, &(expr->d.proc));
 				curproc = NULL;
 			} else {
-				reg = getreg();
-				total += genexpr(buf ? buf + total : NULL, block->decls.data[item->idx].val, reg);
-				total += decl_fromreg(buf ? buf + total : NULL, decl, reg);
-				freereg(reg);
+				struct out tempout = {OUT_REG, getreg()};
+				total += genexpr(buf ? buf + total : NULL, block->decls.data[item->idx].val, &tempout);
+				total += decl_fromreg(buf ? buf + total : NULL, decl, tempout.reg);
+				freereg(tempout.reg);
 			}
 
 			decl->declared = true;
@@ -511,30 +535,30 @@ genblock(char *buf, struct block *block, bool toplevel)
 			struct expr *expr = &exprs.data[assgns.data[item->idx].val];
 			struct assgn *assgn = &assgns.data[item->idx];
 			struct decl *decl = finddecl(assgn->s);
-			enum reg reg;
+			struct out tempout = {OUT_REG};
 			if (decl == NULL)
 				error(assgn->start->line, assgn->start->col, "unknown name");
 
 			if (!decl->declared)
 				error(assgn->start->line, assgn->start->col, "assignment before declaration");
 
+			tempout.reg = getreg();
 			switch (expr->class) {
 			case C_INT:
 				// this is sort of an optimization, since we write at compile-time instead of evaluating and storing. should this happen here in the long term?
-				reg = getreg();
-				total += genexpr(buf ? buf + total : NULL, assgn->val, reg);
-				total += decl_fromreg(buf ? buf + total : NULL, decl, reg);
-				freereg(reg);
+				total += genexpr(buf ? buf + total : NULL, assgn->val, &tempout);
+				total += decl_fromreg(buf ? buf + total : NULL, decl, tempout.reg);
 				break;
 			// FIXME: we assume that any string is a literal, may break if we add binary operands on strings in the future.
 			case C_STR:
 				size_t addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
-				total += mov_r64_imm(buf ? buf + total : NULL, reg, addr);
-				total += decl_fromreg(buf ? buf + total : NULL, decl, reg);
+				total += mov_r64_imm(buf ? buf + total : NULL, tempout.reg, addr);
+				total += decl_fromreg(buf ? buf + total : NULL, decl, tempout.reg);
 				break;
 			default:
 				error(expr->start->line, expr->start->col, "cannot generate code for unknown expression class");
 			}
+			freereg(tempout.reg);
 		} else if (item->kind == ITEM_RETURN) {
 			total += mov_r64_r64(buf ? buf + total : NULL, RSP, RBP);
 			total += pop_r64(buf ? buf + total : NULL, RBP);

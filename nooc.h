@@ -115,7 +115,7 @@ struct decl {
 		DECL_DATA
 	} kind;
 	union {
-		size_t off;
+		int64_t off;
 		size_t addr;
 	} loc;
 	struct token *start;
@@ -222,4 +222,13 @@ struct exprs {
 	size_t cap;
 	size_t len;
 	struct expr *data;
+};
+
+struct out {
+	enum {
+		OUT_REG,
+		OUT_ADDR,
+		OUT_IGNORE,
+	} kind;
+	int reg;
 };

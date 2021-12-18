@@ -28,6 +28,8 @@ size_t add_r64_imm(char *buf, enum reg reg, uint64_t imm);
 size_t mov_r64_imm(char *buf, enum reg reg, uint64_t imm);
 size_t mov_r64_m64(char *buf, enum reg reg, uint64_t addr);
 size_t mov_m64_r64(char *buf, uint64_t addr, enum reg reg);
+size_t mov_mr64_r64(char *buf, enum reg dest, enum reg src);
+size_t mov_r64_mr64(char *buf, enum reg dest, enum reg src);
 size_t mov_r64_r64(char *buf, enum reg dest, enum reg src);
 size_t mov_disp8_m64_r64(char *buf, enum reg dest, int8_t disp, enum reg src);
 size_t mov_disp8_r64_m64(char *buf, enum reg dest, enum reg src, int8_t disp);
