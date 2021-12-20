@@ -264,41 +264,8 @@ typecheck(struct block items)
 		struct decl *decl;
 		struct type *type;
 		struct assgn *assgn;
+		size_t line, col;
 		switch (items.data[i].kind) {
-		case ITEM_DECL:
-			decl = &items.decls.data[item->idx];
-			type = &types.data[decl->type];
-			switch (type->class) {
-			case TYPE_I64:
-				expr = &exprs.data[decl->val];
-				// FIXME: we should be able to deal with ident or fcalls
-				if (expr->class != C_INT)
-					error(decl->start->line, decl->start->col, "expected integer expression for integer declaration");
-				break;
-			case TYPE_STR:
-				expr = &exprs.data[decl->val];
-				// FIXME: we should be able to deal with ident or fcalls
-				if (expr->class != C_STR)
-					error(decl->start->line, decl->start->col, "expected string expression for string declaration");
-				break;
-
-			case TYPE_PROC:
-				expr = &exprs.data[decl->val];
-				if (expr->class != C_PROC)
-					error(decl->start->line, decl->start->col, "expected proc expression for proc declaration");
-
-				if (expr->d.proc.in.len != type->d.params.in.len)
-					error(decl->start->line, decl->start->col, "procedure expression takes %u parameters, but declaration has type which takes %u", expr->d.proc.in.len, type->d.params.in.len);
-
-				for (size_t j = 0; j < expr->d.proc.in.len; j++) {
-					if (expr->d.proc.in.data[j].type != type->d.params.in.data[j])
-						error(decl->start->line, decl->start->col, "unexpected type for parameter %u in procedure declaration", j);
-				}
-				break;
-			default:
-				error(decl->start->line, decl->start->col, "unknown decl type");
-			}
-			break;
 		case ITEM_ASSGN:
 			assgn = &assgns.data[item->idx];
 			decl = finddecl(assgn->s);
@@ -306,21 +273,44 @@ typecheck(struct block items)
 				error(assgn->start->line, assgn->start->col, "unknown name");
 
 			type = &types.data[decl->type];
+			line = assgn->start->line;
+			col = assgn->start->col;
+			goto check;
+		case ITEM_DECL:
+			decl = &items.decls.data[item->idx];
+			type = &types.data[decl->type];
+			line = decl->start->line;
+			col = decl->start->col;
+check:
 			switch (type->class) {
 			case TYPE_I64:
-				expr = &exprs.data[assgn->val];
+				expr = &exprs.data[decl->val];
 				// FIXME: we should be able to deal with ident or fcalls
 				if (expr->class != C_INT)
-					error(assgn->start->line, assgn->start->col, "expected integer expression for integer variable");
+					error(line, col, "expected integer expression for integer declaration");
 				break;
 			case TYPE_STR:
-				expr = &exprs.data[assgn->val];
+				expr = &exprs.data[decl->val];
 				// FIXME: we should be able to deal with ident or fcalls
 				if (expr->class != C_STR)
-					error(assgn->start->line, assgn->start->col, "expected string expression for string variable");
+					error(line, col, "expected string expression for string declaration");
+				break;
+
+			case TYPE_PROC:
+				expr = &exprs.data[decl->val];
+				if (expr->class != C_PROC)
+					error(line, col, "expected proc expression for proc declaration");
+
+				if (expr->d.proc.in.len != type->d.params.in.len)
+					error(line, col, "procedure expression takes %u parameters, but declaration has type which takes %u", expr->d.proc.in.len, type->d.params.in.len);
+
+				for (size_t j = 0; j < expr->d.proc.in.len; j++) {
+					if (expr->d.proc.in.data[j].type != type->d.params.in.data[j])
+						error(line, col, "unexpected type for parameter %u in procedure declaration", j);
+				}
 				break;
 			default:
-				error(assgn->start->line, assgn->start->col, "unknown decl type");
+				error(line, col, "unknown decl type");
 			}
 			break;
 		case ITEM_EXPR:

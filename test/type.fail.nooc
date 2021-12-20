@@ -1,0 +1,2 @@
+let num i64 = 15
+num = "a string"
