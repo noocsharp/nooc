@@ -525,29 +525,19 @@ genblock(char *buf, struct block *block, bool toplevel)
 			struct expr *expr = &exprs.data[assgns.data[item->idx].val];
 			struct assgn *assgn = &assgns.data[item->idx];
 			struct decl *decl = finddecl(assgn->s);
-			struct out tempout = {OUT_REG};
 			if (decl == NULL)
 				error(assgn->start->line, assgn->start->col, "unknown name");
 
 			if (!decl->declared)
 				error(assgn->start->line, assgn->start->col, "assignment before declaration");
 
-			tempout.reg = getreg();
-			switch (expr->class) {
-			case C_INT:
-				// this is sort of an optimization, since we write at compile-time instead of evaluating and storing. should this happen here in the long term?
-				total += genexpr(buf ? buf + total : NULL, assgn->val, &tempout);
-				total += decl_fromreg(buf ? buf + total : NULL, decl, tempout.reg);
-				break;
-			// FIXME: we assume that any string is a literal, may break if we add binary operands on strings in the future.
-			case C_STR:
-				size_t addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
-				total += mov_r64_imm(buf ? buf + total : NULL, tempout.reg, addr);
-				total += decl_fromreg(buf ? buf + total : NULL, decl, tempout.reg);
-				break;
-			default:
-				error(expr->start->line, expr->start->col, "cannot generate code for unknown expression class");
+			if (expr->class == C_PROC) {
+				error(assgn->start->line, assgn->start->col, "reassignment of procedure not allowed (yet)");
 			}
+
+			struct out tempout = {OUT_REG, getreg()};
+			total += genexpr(buf ? buf + total : NULL, assgn->val, &tempout);
+			total += decl_fromreg(buf ? buf + total : NULL, decl, tempout.reg);
 			freereg(tempout.reg);
 		} else if (item->kind == ITEM_RETURN) {
 			total += mov_r64_r64(buf ? buf + total : NULL, RSP, RBP);
