@@ -256,28 +256,28 @@ dumpexpr(int indent, struct expr *expr)
 }
 
 void
-typecheck(struct block items)
+typecheck(struct block *block)
 {
-	for (size_t i = 0; i < items.len; i++) {
-		struct item *item = &items.data[i];
+	for (size_t i = 0; i < block->len; i++) {
+		struct item *item = &block->data[i];
 		struct expr *expr;
 		struct decl *decl;
 		struct type *type;
 		struct assgn *assgn;
 		size_t line, col;
-		switch (items.data[i].kind) {
+		switch (block->data[i].kind) {
 		case ITEM_ASSGN:
 			assgn = &assgns.data[item->idx];
 			decl = finddecl(assgn->s);
 			if (decl == NULL)
-				error(assgn->start->line, assgn->start->col, "unknown name");
+				error(assgn->start->line, assgn->start->col, "typecheck: unknown name '%.*s'", assgn->s.len, assgn->s.data);
 
 			type = &types.data[decl->type];
 			line = assgn->start->line;
 			col = assgn->start->col;
 			goto check;
 		case ITEM_DECL:
-			decl = &items.decls.data[item->idx];
+			decl = &block->decls.data[item->idx];
 			type = &types.data[decl->type];
 			line = decl->start->line;
 			col = decl->start->col;
@@ -285,13 +285,11 @@ check:
 			switch (type->class) {
 			case TYPE_I64:
 				expr = &exprs.data[decl->val];
-				// FIXME: we should be able to deal with ident or fcalls
 				if (expr->class != C_INT)
 					error(line, col, "expected integer expression for integer declaration");
 				break;
 			case TYPE_STR:
 				expr = &exprs.data[decl->val];
-				// FIXME: we should be able to deal with ident or fcalls
 				if (expr->class != C_STR)
 					error(line, col, "expected string expression for string declaration");
 				break;
@@ -314,6 +312,7 @@ check:
 			}
 			break;
 		case ITEM_EXPR:
+		case ITEM_RETURN:
 			break;
 		default:
 			error(item->start->line, item->start->col, "unknown item type");
@@ -494,6 +493,7 @@ size_t
 genblock(char *buf, struct block *block, bool toplevel)
 {
 	blockpush(block);
+	typecheck(block);
 	size_t total = 0;
 	for (int i = 0; i < block->len; i++) {
 		struct item *item = &block->data[i];
@@ -600,7 +600,6 @@ main(int argc, char *argv[])
 	typesmap = mkmap(16);
 	inittypes();
 	struct block items = parse(head);
-	typecheck(items);
 
 	clearreg();
 	size_t len = genblock(NULL, &items, true);

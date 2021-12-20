@@ -196,7 +196,7 @@ enum exprkind {
 };
 
 enum class {
-	C_INT,
+	C_INT = 1,
 	C_STR,
 	C_PROC,
 };

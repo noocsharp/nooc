@@ -103,7 +103,22 @@ parsestring(struct expr *expr)
 	tok = tok->next;
 }
 
-static struct block parseblock();
+enum class
+typetoclass(struct type *type)
+{
+	switch (type->class) {
+	case TYPE_I64:
+		return C_INT;
+	case TYPE_STR:
+		return C_STR;
+	default:
+		die("unknown type class");
+	}
+
+	return 0; // warning
+}
+
+static void parseblock(struct block *block);
 
 static size_t
 parseexpr(struct block *block)
@@ -114,17 +129,17 @@ parseexpr(struct block *block)
 		expr.start = tok;
 		expr.kind = EXPR_LOOP;
 		tok = tok->next;
-		expr.d.loop.block = parseblock();
+		parseblock(&expr.d.loop.block);
 		break;
 	case TOK_IF:
 		expr.start = tok;
 		expr.kind = EXPR_COND;
 		tok = tok->next;
 		expr.d.cond.cond = parseexpr(block);
-		expr.d.cond.bif = parseblock();
+		parseblock(&expr.d.cond.bif);
 		if (tok->type == TOK_ELSE) {
 			tok = tok->next;
-			expr.d.cond.belse = parseblock();
+			parseblock(&expr.d.cond.belse);
 		}
 		break;
 	case TOK_LPAREN:
@@ -147,14 +162,13 @@ parseexpr(struct block *block)
 			parsenametypes(&expr.d.proc.in);
 			if (tok->type == TOK_LPAREN)
 				parsenametypes(&expr.d.proc.out);
-			expr.d.proc.block = parseblock();
 			for (int i = expr.d.proc.in.len - 1; i >= 0; i--) {
 				decl.s = expr.d.proc.in.data[i].name;
 				decl.type = expr.d.proc.in.data[i].type;
 				type = &types.data[decl.type];
 				offset += type->size;
 				decl.loc.off = -offset - 8;
-				array_add((&block->decls), decl);
+				array_add((&expr.d.proc.block.decls), decl);
 			}
 
 			for (size_t i = 0; i < expr.d.proc.out.len; i++) {
@@ -164,12 +178,27 @@ parseexpr(struct block *block)
 				type = &types.data[decl.type];
 				offset += type->size;
 				decl.loc.off = -offset;
-				array_add((&block->decls), decl);
+				array_add((&expr.d.proc.block.decls), decl);
 			}
+			parseblock(&expr.d.proc.block);
 		// a function call
 		} else if (tok->next && tok->next->type == TOK_LPAREN) {
 			size_t pidx;
 			expr.d.call.name = tok->slice;
+			struct decl *decl = finddecl(expr.d.call.name);
+			if (slice_cmplit(&expr.d.call.name, "syscall") == 0) {
+				expr.class = C_INT;
+			} else {
+				if (decl == NULL)
+					error(expr.start->line, expr.start->col, "undeclared procedure '%.*s'", expr.d.s.len, expr.d.s.data);
+
+				struct type *proctype = &types.data[decl->type];
+				if (proctype->d.params.out.len == 1) {
+					struct type *rettype = &types.data[*proctype->d.params.out.data];
+					expr.class = typetoclass(rettype);
+				}
+			}
+
 			tok = tok->next->next;
 			expr.kind = EXPR_FCALL;
 
@@ -187,6 +216,11 @@ parseexpr(struct block *block)
 		} else {
 			expr.kind = EXPR_IDENT;
 			expr.d.s = tok->slice;
+
+			struct decl *decl = finddecl(expr.d.s);
+			if (decl == NULL)
+				error(expr.start->line, expr.start->col, "undeclared identifier '%.*s'", expr.d.s.len, expr.d.s.data);
+			expr.class = typetoclass(&types.data[decl->type]);
 			tok = tok->next;
 		}
 		break;
@@ -306,14 +340,13 @@ parsenametypes(struct nametypes *nametypes)
 	tok = tok->next;
 }
 
-static struct block
-parseblock()
+static void
+parseblock(struct block *block)
 {
-	struct block items = { 0 };
 	struct item item;
 	bool curlies = false;
 
-	blockpush(&items);
+	blockpush(block);
 	if (tok->type == TOK_LCURLY) {
 		curlies = true;
 		tok = tok->next;
@@ -341,15 +374,15 @@ parseblock()
 				error(tok->line, tok->col, "repeat declaration!");
 			}
 
-			decl.val = parseexpr(&items);
-			array_add((&items.decls), decl);
+			decl.val = parseexpr(block);
+			array_add((&block->decls), decl);
 
-			item.idx = items.decls.len - 1;
-			array_add((&items), item);
+			item.idx = block->decls.len - 1;
+			array_add((block), item);
 		} else if (tok->type == TOK_RETURN) {
 			item.kind = ITEM_RETURN;
 			tok = tok->next;
-			array_add((&items), item);
+			array_add((block), item);
 		} else if (tok->type == TOK_NAME && tok->next && tok->next->type == TOK_EQUAL) {
 			struct assgn assgn = { 0 };
 			assgn.start = tok;
@@ -357,15 +390,15 @@ parseblock()
 			assgn.s = tok->slice;
 
 			tok = tok->next->next;
-			assgn.val = parseexpr(&items);
+			assgn.val = parseexpr(block);
 			array_add((&assgns), assgn);
 
 			item.idx = assgns.len - 1;
-			array_add((&items), item);
+			array_add(block, item);
 		} else {
 			item.kind = ITEM_EXPR;
-			item.idx = parseexpr(&items);
-			array_add((&items), item);
+			item.idx = parseexpr(block);
+			array_add(block, item);
 		}
 	}
 
@@ -375,12 +408,13 @@ parseblock()
 	}
 
 	blockpop();
-	return items;
 }
 
 struct block
 parse(struct token *start)
 {
 	tok = start;
-	return parseblock();
+	struct block block = { 0 };
+	parseblock(&block);
+	return block;
 }
