@@ -48,6 +48,7 @@ inittypes()
 	mapput(typesmap, &key)->n = idx;
 
 	type.class = TYPE_STR;
+	type.size = 8;
 	idx = type_put(&type);
 	mapkey(&key, "str", 3);
 	mapput(typesmap, &key)->n = idx;
@@ -130,7 +131,8 @@ type_put(struct type *type)
 		memcpy(table.keys[i].hash, out, 16);
 		array_add((&types), (*type));
 		table.vals[i] = types.len - 1;
+		return types.len - 1;
 	}
 
-	return types.len - 1;
+	return table.vals[i];
 }
