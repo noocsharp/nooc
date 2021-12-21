@@ -273,29 +273,28 @@ typecheck(struct block *block)
 				error(assgn->start->line, assgn->start->col, "typecheck: unknown name '%.*s'", assgn->s.len, assgn->s.data);
 
 			type = &types.data[decl->type];
+			expr = &exprs.data[assgn->val];
 			line = assgn->start->line;
 			col = assgn->start->col;
 			goto check;
 		case ITEM_DECL:
 			decl = &block->decls.data[item->idx];
 			type = &types.data[decl->type];
+			expr = &exprs.data[decl->val];
 			line = decl->start->line;
 			col = decl->start->col;
 check:
 			switch (type->class) {
 			case TYPE_I64:
-				expr = &exprs.data[decl->val];
 				if (expr->class != C_INT)
 					error(line, col, "expected integer expression for integer declaration");
 				break;
 			case TYPE_STR:
-				expr = &exprs.data[decl->val];
 				if (expr->class != C_STR)
 					error(line, col, "expected string expression for string declaration");
 				break;
 
 			case TYPE_PROC:
-				expr = &exprs.data[decl->val];
 				if (expr->class != C_PROC)
 					error(line, col, "expected proc expression for proc declaration");
 

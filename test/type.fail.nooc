@@ -1,2 +1,4 @@
-let num i64 = 15
-num = "a string"
+let main proc() = proc() {
+	let num i64 = 15
+	num = "a string"
+}
