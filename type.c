@@ -40,10 +40,17 @@ inittypes()
 	// first one should be 0
 	type_put(&type);
 
-	type.class = TYPE_I64;
+	type.class = TYPE_INT;
 	type.size = 8;
 	size_t idx = type_put(&type);
 	mapkey(&key, "i64", 3);
+	mapput(typesmap, &key)->n = idx;
+
+	type.class = TYPE_INT;
+	type.size = 4;
+	idx = type_put(&type);
+	mapkey(&key, "i32", 3);
+	mapput(typesmap, &key)->n = idx;
 
 	mapput(typesmap, &key)->n = idx;
 
@@ -61,7 +68,8 @@ hashtype(struct type *type, uint8_t *out)
 
 	blake3_init(&b3);
 
-	blake3_update(&b3, &type->class, sizeof(enum typeclass));
+	blake3_update(&b3, &type->class, sizeof(type->class));
+	blake3_update(&b3, &type->size, sizeof(type->size));
 	switch (type->class) {
 	case TYPE_PROC:
 		blake3_update(&b3, type->d.params.in.data, type->d.params.in.len * sizeof(*type->d.params.in.data));

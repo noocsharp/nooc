@@ -91,16 +91,35 @@ decl_alloc(struct block *block, struct decl *decl)
 size_t
 decl_fromreg(char *buf, struct decl *decl, enum reg reg)
 {
+	struct type *type = &types.data[decl->type];
+
 	size_t total = 0;
 	switch (decl->kind) {
 	case DECL_DATA:
-		total += mov_m64_r64(buf ? buf + total : NULL, decl->loc.addr, reg);
+		switch (type->size) {
+		case 8:
+			total += mov_m64_r64(buf ? buf + total : NULL, decl->loc.addr, reg);
+			break;
+		case 4:
+			total += mov_m32_r32(buf ? buf + total : NULL, decl->loc.addr, reg);
+			break;
+		default:
+			die("decl_fromreg: unsupported size for mov_mn_rn");
+		}
 		break;
 	case DECL_STACK:
-		total += mov_disp8_m64_r64(buf, reg, -decl->loc.off, RBP);
+		switch (type->size) {
+		case 8:
+			total += mov_disp8_m64_r64(buf, reg, -decl->loc.off, RBP);
+			break;
+		case 4:
+			total += mov_disp8_m32_r32(buf, reg, -decl->loc.off, RBP);
+			break;
+		default:
+			die("decl_toreg: unsupported size for mov_disp8_mn_rn");
+		}
 		break;
 	default:
-		fprintf(stderr, "%d\n", decl->kind);
 		die("decl_fromreg: unknown decl kind");
 	}
 
@@ -111,13 +130,32 @@ decl_fromreg(char *buf, struct decl *decl, enum reg reg)
 size_t
 decl_toreg(char *buf, enum reg reg, struct decl *decl)
 {
+	struct type *type = &types.data[decl->type];
 	size_t total = 0;
 	switch (decl->kind) {
 	case DECL_DATA:
-		total += mov_r64_m64(buf ? buf + total : NULL, reg, decl->loc.addr);
+		switch (type->size) {
+		case 8:
+			total += mov_r64_m64(buf ? buf + total : NULL, reg, decl->loc.addr);
+			break;
+		case 4:
+			total += mov_r32_m32(buf ? buf + total : NULL, reg, decl->loc.addr);
+			break;
+		default:
+			die("decl_toreg: unsupported size for mov_mn_rn");
+		}
 		break;
 	case DECL_STACK:
-		total += mov_disp8_r64_m64(buf, reg, RBP, -decl->loc.off);
+		switch (type->size) {
+		case 8:
+			total += mov_disp8_r64_m64(buf, reg, RBP, -decl->loc.off);
+			break;
+		case 4:
+			total += mov_disp8_r32_m32(buf, reg, RBP, -decl->loc.off);
+			break;
+		default:
+			die("decl_fromreg: unsupported size for mov_mn_rn");
+		}
 		break;
 	default:
 		die("unknown decl type!");
@@ -285,7 +323,7 @@ typecheck(struct block *block)
 			col = decl->start->col;
 check:
 			switch (type->class) {
-			case TYPE_I64:
+			case TYPE_INT:
 				if (expr->class != C_INT)
 					error(line, col, "expected integer expression for integer declaration");
 				break;

@@ -72,15 +72,32 @@ mov_r64_imm(char *buf, enum reg dest, uint64_t imm)
 {
 	if (buf) {
 		*(buf++) = REX_W | (dest >= 8 ? REX_B : 0);
-		*(buf++) = 0xc7;
-		*(buf++) = (MOD_DIRECT << 6) | (dest & 0x7);
+		*(buf++) = 0xb8 + (dest & 0x7);
+		*(buf++) = imm & 0xFF;
+		*(buf++) = (imm >> 8) & 0xFF;
+		*(buf++) = (imm >> 16) & 0xFF;
+		*(buf++) = (imm >> 24) & 0xFF;
+		*(buf++) = (imm >> 32) & 0xFF;
+		*(buf++) = (imm >> 40) & 0xFF;
+		*(buf++) = (imm >> 48) & 0xFF;
+		*(buf++) = (imm >> 56) & 0xFF;
+	}
+
+	return 10;
+}
+
+size_t
+mov_r32_imm(char *buf, enum reg dest, uint32_t imm)
+{
+	if (buf) {
+		*(buf++) = 0xb8 + (dest & 0x7);
 		*(buf++) = imm & 0xFF;
 		*(buf++) = (imm >> 8) & 0xFF;
 		*(buf++) = (imm >> 16) & 0xFF;
 		*(buf++) = (imm >> 24) & 0xFF;
 	}
 
-	return 7;
+	return 5;
 }
 
 size_t
@@ -102,21 +119,57 @@ mov_r64_m64(char *buf, enum reg dest, uint64_t addr)
 }
 
 size_t
-mov_m64_r64(char *buf, uint64_t addr, enum reg src)
+mov_r32_m32(char *buf, enum reg dest, uint32_t addr)
 {
-	uint8_t sib = 0x25;
 	if (buf) {
-		*(buf++) = REX_W;
-		*(buf++) = 0x89;
-		*(buf++) = (MOD_INDIRECT << 6) | (src << 3) | 4;
-		*(buf++) = sib;
+		if (dest >= 8) *(buf++) = REX_R;
+		*(buf++) = 0x8b;
+		*(buf++) = (MOD_INDIRECT << 6) | ((dest & 7) << 3) | 4;
+		*(buf++) = 0x25;
 		*(buf++) = addr & 0xFF;
 		*(buf++) = (addr >> 8) & 0xFF;
 		*(buf++) = (addr >> 16) & 0xFF;
 		*(buf++) = (addr >> 24) & 0xFF;
 	}
 
-	return 8;
+	return dest >= 8 ? 8 : 7;
+}
+
+size_t
+mov_m64_r64(char *buf, uint64_t addr, enum reg src)
+{
+	if (buf) {
+		*(buf++) = REX_W;
+		*(buf++) = 0xA3;
+		*(buf++) = addr & 0xFF;
+		*(buf++) = (addr >> 8) & 0xFF;
+		*(buf++) = (addr >> 16) & 0xFF;
+		*(buf++) = (addr >> 24) & 0xFF;
+		*(buf++) = (addr >> 32) & 0xFF;
+		*(buf++) = (addr >> 40) & 0xFF;
+		*(buf++) = (addr >> 48) & 0xFF;
+		*(buf++) = (addr >> 56) & 0xFF;
+	}
+
+	return 10;
+}
+
+size_t
+mov_m32_r32(char *buf, uint64_t addr, enum reg src)
+{
+	if (buf) {
+		*(buf++) = 0xA3;
+		*(buf++) = addr & 0xFF;
+		*(buf++) = (addr >> 8) & 0xFF;
+		*(buf++) = (addr >> 16) & 0xFF;
+		*(buf++) = (addr >> 24) & 0xFF;
+		*(buf++) = (addr >> 32) & 0xFF;
+		*(buf++) = (addr >> 40) & 0xFF;
+		*(buf++) = (addr >> 48) & 0xFF;
+		*(buf++) = (addr >> 56) & 0xFF;
+	}
+
+	return 9;
 }
 
 size_t
@@ -169,6 +222,20 @@ mov_disp8_m64_r64(char *buf, enum reg dest, int8_t disp, enum reg src)
 	return 4;
 }
 
+// FIXME: we don't handle r8-r15 properly in most of these
+size_t
+mov_disp8_m32_r32(char *buf, enum reg dest, int8_t disp, enum reg src)
+{
+	assert(src != 4);
+	if (buf) {
+		*(buf++) = 0x89;
+		*(buf++) = (MOD_DISP8 << 6) | (dest << 3) | src;
+		*(buf++) = disp;
+	}
+
+	return 3;
+}
+
 size_t
 mov_disp8_r64_m64(char *buf, enum reg dest, enum reg src, int8_t disp)
 {
@@ -181,6 +248,19 @@ mov_disp8_r64_m64(char *buf, enum reg dest, enum reg src, int8_t disp)
 	}
 
 	return 4;
+}
+
+size_t
+mov_disp8_r32_m32(char *buf, enum reg dest, enum reg src, int8_t disp)
+{
+	assert(src != 4);
+	if (buf) {
+		*(buf++) = 0x8b;
+		*(buf++) = (MOD_DISP8 << 6) | (dest << 3) | src;
+		*(buf++) = disp;
+	}
+
+	return 3;
 }
 
 size_t

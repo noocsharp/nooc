@@ -107,7 +107,7 @@ enum class
 typetoclass(struct type *type)
 {
 	switch (type->class) {
-	case TYPE_I64:
+	case TYPE_INT:
 		return C_INT;
 	case TYPE_STR:
 		return C_STR;

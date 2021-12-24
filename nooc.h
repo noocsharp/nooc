@@ -60,7 +60,7 @@ struct typelist {
 };
 
 enum typeclass {
-	TYPE_I64 = 1,
+	TYPE_INT = 1,
 	TYPE_STR,
 	TYPE_PROC,
 };
