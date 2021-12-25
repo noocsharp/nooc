@@ -24,7 +24,6 @@
 
 extern struct block *blockstack[BLOCKSTACKSIZE];
 extern size_t blocki;
-struct proc *curproc;
 
 const char *const tokenstr[] = {
 	[TOK_NONE] = "TOK_NONE",
@@ -576,10 +575,7 @@ genblock(char *buf, struct block *block, bool toplevel)
 			if (toplevel) {
 				if (expr->class == C_PROC) {
 					block->decls.data[item->idx].loc.addr = total + TEXT_OFFSET;
-					// FIXME: won't work for nested functions
-					curproc = &expr->d.proc;
 					total += genproc(buf ? buf + total : NULL, &(expr->d.proc));
-					curproc = NULL;
 				} else {
 					evalexpr(decl);
 				}

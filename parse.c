@@ -14,7 +14,6 @@
 
 extern struct block *blockstack[BLOCKSTACKSIZE];
 extern size_t blocki;
-extern struct proc *curproc;
 
 extern const char *const tokenstr[];
 
