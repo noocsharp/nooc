@@ -71,6 +71,13 @@ data_pushzero(size_t len)
 }
 
 void
+decl_set(struct decl *decl, void *ptr)
+{
+	struct type *type = &types.data[decl->type];
+	memcpy(&data_seg.data[decl->loc.addr - DATA_OFFSET], ptr, type->size);
+}
+
+void
 decl_alloc(struct block *block, struct decl *decl)
 {
 	struct type *type = &types.data[decl->type];
@@ -233,7 +240,7 @@ dumpval(struct expr *e)
 {
 	switch (e->class) {
 	case C_INT:
-		fprintf(stderr, "%ld", e->d.v.v.i);
+		fprintf(stderr, "%ld", e->d.v.v.i64);
 		break;
 	case C_STR:
 		fprintf(stderr, "\"%.*s\"", (int)e->d.v.v.s.len, e->d.v.v.s.data);
@@ -435,7 +442,7 @@ genexpr(char *buf, size_t idx, struct out *out)
 		enum reg reg = getreg();
 		switch (expr->class) {
 		case C_INT:
-			total += mov_r64_imm(buf ? buf + total : buf, reg, expr->d.v.v.i);
+			total += mov_r64_imm(buf ? buf + total : buf, reg, expr->d.v.v.i64);
 			break;
 		case C_STR: {
 			int addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
@@ -525,6 +532,28 @@ genexpr(char *buf, size_t idx, struct out *out)
 	return total;
 }
 
+void
+evalexpr(struct decl *decl)
+{
+	struct expr *expr = &exprs.data[decl->val];
+	if (expr->kind == EXPR_LIT) {
+		switch (expr->class) {
+		case C_INT:
+			decl_set(decl, &expr->d.v.v);
+			break;
+		case C_STR: {
+			uint64_t addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
+			decl_set(decl, &addr);
+			break;
+		}
+		default:
+			error(expr->start->line, expr->start->col, "genexpr: unknown value type!");
+		}
+	} else {
+		error(expr->start->line, expr->start->col, "cannot evaluate expression at compile time");
+	}
+}
+
 // FIXME: It is not ideal to calculate length by doing all the calculations to generate instruction, before we actually write the instructions.
 size_t
 genblock(char *buf, struct block *block, bool toplevel)
@@ -544,12 +573,16 @@ genblock(char *buf, struct block *block, bool toplevel)
 			decl->kind = toplevel ? DECL_DATA : DECL_STACK;
 			decl_alloc(block, decl);
 
-			if (expr->class == C_PROC) {
-				block->decls.data[item->idx].loc.addr = total + TEXT_OFFSET;
-				// FIXME: won't work for nested functions
-				curproc = &expr->d.proc;
-				total += genproc(buf ? buf + total : NULL, &(expr->d.proc));
-				curproc = NULL;
+			if (toplevel) {
+				if (expr->class == C_PROC) {
+					block->decls.data[item->idx].loc.addr = total + TEXT_OFFSET;
+					// FIXME: won't work for nested functions
+					curproc = &expr->d.proc;
+					total += genproc(buf ? buf + total : NULL, &(expr->d.proc));
+					curproc = NULL;
+				} else {
+					evalexpr(decl);
+				}
 			} else {
 				struct out tempout = {OUT_REG, getreg()};
 				total += genexpr(buf ? buf + total : NULL, block->decls.data[item->idx].val, &tempout);

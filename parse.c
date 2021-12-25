@@ -228,7 +228,7 @@ parseexpr(struct block *block)
 		expr.kind = EXPR_LIT;
 		expr.class = C_INT;
 		// FIXME: error check
-		expr.d.v.v.i = strtol(tok->slice.data, NULL, 10);
+		expr.d.v.v.i64 = strtol(tok->slice.data, NULL, 10);
 		tok = tok->next;
 		break;
 	case TOK_GREATER:

@@ -180,7 +180,8 @@ enum binop {
 
 struct value {
 	union {
-		uint64_t i;
+		int64_t i64;
+		int32_t i32;
 		struct slice s;
 	} v;
 };
