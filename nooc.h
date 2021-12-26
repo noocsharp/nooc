@@ -185,6 +185,7 @@ enum binop {
 	OP_PLUS,
 	OP_MINUS,
 	OP_GREATER,
+	OP_EQUAL,
 };
 
 struct value {

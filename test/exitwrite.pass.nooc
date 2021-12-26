@@ -11,7 +11,7 @@ let exit proc(i64) = proc(code i64) {
 let main proc() = proc() {
 	let ret i64 = 0
 	ret = write(1, "hello\n", 6)
-	if > ret 0 {
+	if = ret 6 {
 		exit(0)
 	} else {
 		exit(1)

@@ -470,6 +470,23 @@ jg(char *buf, int64_t offset)
 }
 
 size_t
+jne(char *buf, int64_t offset)
+{
+	if (-256 <= offset && offset <= 255) {
+		int8_t i = offset;
+		if (buf) {
+			*(buf++) = 0x75;
+			*(buf++) = i;
+		}
+		return 2;
+	} else {
+		die("unimplemented jng offet!");
+	}
+
+	return 0; // prevents warning
+}
+
+size_t
 jmp(char *buf, int64_t offset)
 {
 	if (-256 <= offset && offset <= 255) {

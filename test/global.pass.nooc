@@ -1,7 +1,7 @@
 let a i32 = 10
 
 let main proc() = proc() {
-	if > a 5 {
+	if = a 10 {
 		syscall(60, 0)
 	} else {
 		syscall(60, 1)

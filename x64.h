@@ -51,6 +51,7 @@ size_t sub_r64_imm(char *buf, enum reg reg1, int32_t imm);
 size_t cmp_r64_r64(char *buf, enum reg reg1, enum reg reg2);
 size_t jng(char *buf, int64_t offset);
 size_t jg(char *buf, int64_t offset);
+size_t jne(char *buf, int64_t offset);
 size_t jmp(char *buf, int64_t offset);
 size_t call(char *buf, enum reg reg);
 size_t ret(char *buf);

@@ -298,6 +298,9 @@ dumpbinop(enum binop op)
 	case OP_GREATER:
 		fprintf(stderr, "OP_GREATER");
 		break;
+	case OP_EQUAL:
+		fprintf(stderr, "OP_EQUAL");
+		break;
 	default:
 		die("invalid binop");
 	}
@@ -510,6 +513,7 @@ genexpr(char *buf, size_t idx, struct place *out)
 			total += sub_r64_r64(buf ? buf + total : buf, regbuf.l.reg, place2.l.reg);
 			break;
 		}
+		case OP_EQUAL:
 		case OP_GREATER: {
 			total += cmp_r64_r64(buf ? buf + total : buf, regbuf.l.reg, place2.l.reg);
 			break;
@@ -552,6 +556,9 @@ genexpr(char *buf, size_t idx, struct place *out)
 		switch (binary->d.op) {
 		case OP_GREATER:
 			total += jng(buf ? buf + total : NULL, iflen);
+			break;
+		case OP_EQUAL:
+			total += jne(buf ? buf + total : NULL, iflen);
 			break;
 		default:
 			error(expr->start->line, expr->start->col, "unknown binop for conditional");

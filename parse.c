@@ -233,6 +233,10 @@ parseexpr(struct block *block)
 		expr.d.v.v.i64 = strtol(tok->slice.data, NULL, 10);
 		tok = tok->next;
 		break;
+	case TOK_EQUAL:
+		expr.kind = EXPR_BINARY;
+		expr.d.op = OP_EQUAL;
+		goto binary_common;
 	case TOK_GREATER:
 		expr.kind = EXPR_BINARY;
 		expr.d.op = OP_GREATER;
