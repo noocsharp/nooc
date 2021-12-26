@@ -215,7 +215,7 @@ mov_disp8_m64_r64(char *buf, enum reg dest, int8_t disp, enum reg src)
 	if (buf) {
 		*(buf++) = REX_W;
 		*(buf++) = 0x89;
-		*(buf++) = (MOD_DISP8 << 6) | (dest << 3) | src;
+		*(buf++) = (MOD_DISP8 << 6) | (src << 3) | dest;
 		*(buf++) = disp;
 	}
 
