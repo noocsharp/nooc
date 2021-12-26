@@ -57,6 +57,12 @@ inittypes()
 	mapkey(&key, "i16", 3);
 	mapput(typesmap, &key)->n = idx;
 
+	type.class = TYPE_INT;
+	type.size = 1;
+	idx = type_put(&type);
+	mapkey(&key, "i8", 2);
+	mapput(typesmap, &key)->n = idx;
+
 	type.class = TYPE_STR;
 	type.size = 8;
 	idx = type_put(&type);

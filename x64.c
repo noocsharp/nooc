@@ -115,6 +115,17 @@ mov_r16_imm(char *buf, enum reg dest, uint16_t imm)
 }
 
 size_t
+mov_r8_imm(char *buf, enum reg dest, uint8_t imm)
+{
+	if (buf) {
+		*(buf++) = 0xb0 + (dest & 0x7);
+		*(buf++) = imm;
+	}
+
+	return 2;
+}
+
+size_t
 mov_r64_m64(char *buf, enum reg dest, uint64_t addr)
 {
 	uint8_t sib = 0x25;
@@ -165,6 +176,23 @@ mov_r16_m16(char *buf, enum reg dest, uint32_t addr)
 	}
 
 	return dest >= 8 ? 9 : 8;
+}
+
+size_t
+mov_r8_m8(char *buf, enum reg dest, uint32_t addr)
+{
+	if (buf) {
+		if (dest >= 8) *(buf++) = REX_R;
+		*(buf++) = 0x8a;
+		*(buf++) = (MOD_INDIRECT << 6) | ((dest & 7) << 3) | 4;
+		*(buf++) = 0x25;
+		*(buf++) = addr & 0xFF;
+		*(buf++) = (addr >> 8) & 0xFF;
+		*(buf++) = (addr >> 16) & 0xFF;
+		*(buf++) = (addr >> 24) & 0xFF;
+	}
+
+	return dest >= 8 ? 8 : 7;
 }
 
 size_t
@@ -240,6 +268,17 @@ mov_mr16_r16(char *buf, enum reg dest, enum reg src)
 }
 
 size_t
+mov_mr8_r8(char *buf, enum reg dest, enum reg src)
+{
+	if (buf) {
+		*(buf++) = 0x8A;
+		*(buf++) = (MOD_INDIRECT << 6) | (src << 3) | dest;
+	}
+
+	return 2;
+}
+
+size_t
 mov_r64_mr64(char *buf, enum reg dest, enum reg src)
 {
 	if (buf) {
@@ -272,6 +311,17 @@ mov_r16_mr16(char *buf, enum reg dest, enum reg src)
 	}
 
 	return 3;
+}
+
+size_t
+mov_r8_mr8(char *buf, enum reg dest, enum reg src)
+{
+	if (buf) {
+		*(buf++) = 0x88;
+		*(buf++) = (MOD_INDIRECT << 6) | (dest << 3) | src;
+	}
+
+	return 2;
 }
 
 size_t
@@ -341,6 +391,20 @@ mov_disp8_m16_r16(char *buf, enum reg dest, int8_t disp, enum reg src)
 	return 4;
 }
 
+// FIXME: we don't handle r8-r15 properly in most of these
+size_t
+mov_disp8_m8_r8(char *buf, enum reg dest, int8_t disp, enum reg src)
+{
+	assert(src != 4);
+	if (buf) {
+		*(buf++) = 0x88;
+		*(buf++) = (MOD_DISP8 << 6) | (src << 3) | dest;
+		*(buf++) = disp;
+	}
+
+	return 3;
+}
+
 size_t
 mov_disp8_r64_m64(char *buf, enum reg dest, enum reg src, int8_t disp)
 {
@@ -380,6 +444,19 @@ mov_disp8_r16_m16(char *buf, enum reg dest, enum reg src, int8_t disp)
 	}
 
 	return 4;
+}
+
+size_t
+mov_disp8_r8_m8(char *buf, enum reg dest, enum reg src, int8_t disp)
+{
+	assert(src != 4);
+	if (buf) {
+		*(buf++) = 0x8A;
+		*(buf++) = (MOD_DISP8 << 6) | (dest << 3) | src;
+		*(buf++) = disp;
+	}
+
+	return 3;
 }
 
 size_t
