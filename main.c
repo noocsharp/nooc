@@ -1,6 +1,4 @@
 #include <assert.h>
-#include <ctype.h>
-#include <elf.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <string.h>

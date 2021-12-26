@@ -21,7 +21,6 @@ THIS SOFTWARE.
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 #include "nooc.h"
 #include "util.h"
