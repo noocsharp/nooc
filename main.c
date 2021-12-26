@@ -113,6 +113,9 @@ place_move(char *buf, struct place *dest, struct place *src)
 			case 4:
 				total += mov_mr32_r32(buf ? buf + total : NULL, dest->l.reg, src->l.reg);
 				break;
+			case 2:
+				total += mov_mr16_r16(buf ? buf + total : NULL, dest->l.reg, src->l.reg);
+				break;
 			default:
 				die("place_move: REG -> REGADDR: unhandled size");
 			}
@@ -124,6 +127,9 @@ place_move(char *buf, struct place *dest, struct place *src)
 				break;
 			case 4:
 				total += mov_disp8_m32_r32(buf ? buf + total : NULL, RBP, -dest->l.off, src->l.reg);
+				break;
+			case 2:
+				total += mov_disp8_m16_r16(buf ? buf + total : NULL, RBP, -dest->l.off, src->l.reg);
 				break;
 			default:
 				die("place_move: REG -> REGADDR: unhandled size");
@@ -153,6 +159,15 @@ place_move(char *buf, struct place *dest, struct place *src)
 				die("place_move: unhandled dest case for PLACE_REGADDR");
 			}
 			break;
+		case 2:
+			switch (dest->kind) {
+			case PLACE_REG:
+				total += mov_r16_mr16(buf ? buf + total : NULL, dest->l.reg, src->l.reg);
+				break;
+			default:
+				die("place_move: unhandled dest case for PLACE_REGADDR");
+			}
+			break;
 		default:
 			die("place_move: REGADDR: src unhandled size");
 		}
@@ -177,6 +192,15 @@ place_move(char *buf, struct place *dest, struct place *src)
 				die("place_move: unhandled dest case for PLACE_FRAME");
 			}
 			break;
+		case 2:
+			switch (dest->kind) {
+			case PLACE_REG:
+				total += mov_disp8_r16_m16(buf ? buf + total : NULL, dest->l.reg, RBP, -src->l.off);
+				break;
+			default:
+				die("place_move: unhandled dest case for PLACE_FRAME");
+			}
+			break;
 		default:
 			die("place_move: FRAME: src unhandled size");
 		}
@@ -196,6 +220,15 @@ place_move(char *buf, struct place *dest, struct place *src)
 			switch (dest->kind) {
 			case PLACE_REG:
 				total += mov_r32_m32(buf ? buf + total : NULL, dest->l.reg, src->l.addr);
+				break;
+			default:
+				die("place_move: unhandled dest case for PLACE_ABS");
+			}
+			break;
+		case 2:
+			switch (dest->kind) {
+			case PLACE_REG:
+				total += mov_r16_m16(buf ? buf + total : NULL, dest->l.reg, src->l.addr);
 				break;
 			default:
 				die("place_move: unhandled dest case for PLACE_ABS");

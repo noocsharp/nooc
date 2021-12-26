@@ -22,6 +22,8 @@ enum mod {
 	MOD_DIRECT
 };
 
+#define OP_SIZE_OVERRIDE 0x66
+
 char abi_arg[] = {RAX, RDI, RSI, RDX, R10, R8, R9};
 unsigned short used_reg;
 
@@ -101,6 +103,19 @@ mov_r32_imm(char *buf, enum reg dest, uint32_t imm)
 }
 
 size_t
+mov_r16_imm(char *buf, enum reg dest, uint16_t imm)
+{
+	if (buf) {
+		*(buf++) = OP_SIZE_OVERRIDE;
+		*(buf++) = 0xb8;
+		*(buf++) = imm & 0xFF;
+		*(buf++) = (imm >> 8) & 0xFF;
+	}
+
+	return 4;
+}
+
+size_t
 mov_r64_m64(char *buf, enum reg dest, uint64_t addr)
 {
 	uint8_t sib = 0x25;
@@ -133,6 +148,24 @@ mov_r32_m32(char *buf, enum reg dest, uint32_t addr)
 	}
 
 	return dest >= 8 ? 8 : 7;
+}
+
+size_t
+mov_r16_m16(char *buf, enum reg dest, uint32_t addr)
+{
+	if (buf) {
+		*(buf++) = OP_SIZE_OVERRIDE;
+		if (dest >= 8) *(buf++) = REX_R;
+		*(buf++) = 0x8b;
+		*(buf++) = (MOD_INDIRECT << 6) | ((dest & 7) << 3) | 4;
+		*(buf++) = 0x25;
+		*(buf++) = addr & 0xFF;
+		*(buf++) = (addr >> 8) & 0xFF;
+		*(buf++) = (addr >> 16) & 0xFF;
+		*(buf++) = (addr >> 24) & 0xFF;
+	}
+
+	return dest >= 8 ? 9 : 8;
 }
 
 size_t
@@ -196,6 +229,18 @@ mov_mr32_r32(char *buf, enum reg dest, enum reg src)
 }
 
 size_t
+mov_mr16_r16(char *buf, enum reg dest, enum reg src)
+{
+	if (buf) {
+		*(buf++) = OP_SIZE_OVERRIDE;
+		*(buf++) = 0x8B;
+		*(buf++) = (MOD_INDIRECT << 6) | (src << 3) | dest;
+	}
+
+	return 3;
+}
+
+size_t
 mov_r64_mr64(char *buf, enum reg dest, enum reg src)
 {
 	if (buf) {
@@ -216,6 +261,18 @@ mov_r32_mr32(char *buf, enum reg dest, enum reg src)
 	}
 
 	return 2;
+}
+
+size_t
+mov_r16_mr16(char *buf, enum reg dest, enum reg src)
+{
+	if (buf) {
+		*(buf++) = OP_SIZE_OVERRIDE;
+		*(buf++) = 0x89;
+		*(buf++) = (MOD_INDIRECT << 6) | (dest << 3) | src;
+	}
+
+	return 3;
 }
 
 size_t
@@ -270,6 +327,21 @@ mov_disp8_m32_r32(char *buf, enum reg dest, int8_t disp, enum reg src)
 	return 3;
 }
 
+// FIXME: we don't handle r8-r15 properly in most of these
+size_t
+mov_disp8_m16_r16(char *buf, enum reg dest, int8_t disp, enum reg src)
+{
+	assert(src != 4);
+	if (buf) {
+		*(buf++) = OP_SIZE_OVERRIDE;
+		*(buf++) = 0x89;
+		*(buf++) = (MOD_DISP8 << 6) | (src << 3) | dest;
+		*(buf++) = disp;
+	}
+
+	return 4;
+}
+
 size_t
 mov_disp8_r64_m64(char *buf, enum reg dest, enum reg src, int8_t disp)
 {
@@ -295,6 +367,20 @@ mov_disp8_r32_m32(char *buf, enum reg dest, enum reg src, int8_t disp)
 	}
 
 	return 3;
+}
+
+size_t
+mov_disp8_r16_m16(char *buf, enum reg dest, enum reg src, int8_t disp)
+{
+	assert(src != 4);
+	if (buf) {
+		*(buf++) = OP_SIZE_OVERRIDE;
+		*(buf++) = 0x8b;
+		*(buf++) = (MOD_DISP8 << 6) | (dest << 3) | src;
+		*(buf++) = disp;
+	}
+
+	return 4;
 }
 
 size_t
