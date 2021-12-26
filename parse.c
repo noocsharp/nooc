@@ -167,6 +167,7 @@ parseexpr(struct block *block)
 				decl.type = expr.d.proc.in.data[i].type;
 				decl.place.kind = PLACE_FRAME;
 				type = &types.data[decl.type];
+				decl.place.size = type->size;
 				offset += type->size;
 				decl.place.l.off = -offset - 8;
 				array_add((&expr.d.proc.block.decls), decl);

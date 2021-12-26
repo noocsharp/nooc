@@ -118,6 +118,7 @@ struct place {
 		int64_t off;
 		int reg;
 	} l;
+	size_t size;
 };
 
 struct decl {

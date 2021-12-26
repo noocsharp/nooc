@@ -81,6 +81,7 @@ void
 decl_alloc(struct block *block, struct decl *decl)
 {
 	struct type *type = &types.data[decl->type];
+	decl->place.size = type->size;
 	switch (decl->place.kind) {
 	case PLACE_ABS:
 		decl->place.l.addr = data_pushzero(type->size);
@@ -105,40 +106,103 @@ place_move(char *buf, struct place *dest, struct place *src)
 			total += mov_r64_r64(buf ? buf + total : NULL, dest->l.reg, src->l.reg);
 			break;
 		case PLACE_REGADDR:
-			total += mov_mr64_r64(buf ? buf + total : NULL, dest->l.reg, src->l.reg);
+			switch (dest->size) {
+			case 8:
+				total += mov_mr64_r64(buf ? buf + total : NULL, dest->l.reg, src->l.reg);
+				break;
+			case 4:
+				total += mov_mr32_r32(buf ? buf + total : NULL, dest->l.reg, src->l.reg);
+				break;
+			default:
+				die("place_move: REG -> REGADDR: unhandled size");
+			}
 			break;
 		case PLACE_FRAME:
-			total += mov_disp8_m64_r64(buf ? buf + total : NULL, RBP, -dest->l.off, src->l.reg);
+			switch (dest->size) {
+			case 8:
+				total += mov_disp8_m64_r64(buf ? buf + total : NULL, RBP, -dest->l.off, src->l.reg);
+				break;
+			case 4:
+				total += mov_disp8_m32_r32(buf ? buf + total : NULL, RBP, -dest->l.off, src->l.reg);
+				break;
+			default:
+				die("place_move: REG -> REGADDR: unhandled size");
+			}
 			break;
 		default:
 			die("place_move: unhandled dest case for PLACE_REG");
 		}
 		break;
 	case PLACE_REGADDR:
-		switch (dest->kind) {
-		case PLACE_REG:
-			total += mov_r64_mr64(buf ? buf + total : NULL, dest->l.reg, src->l.reg);
+		switch (src->size) {
+		case 8:
+			switch (dest->kind) {
+			case PLACE_REG:
+				total += mov_r64_mr64(buf ? buf + total : NULL, dest->l.reg, src->l.reg);
+				break;
+			default:
+				die("place_move: unhandled dest case for PLACE_REGADDR");
+			}
+			break;
+		case 4:
+			switch (dest->kind) {
+			case PLACE_REG:
+				total += mov_r32_mr32(buf ? buf + total : NULL, dest->l.reg, src->l.reg);
+				break;
+			default:
+				die("place_move: unhandled dest case for PLACE_REGADDR");
+			}
 			break;
 		default:
-			die("place_move: unhandled dest case for PLACE_REGADDR");
+			die("place_move: REGADDR: src unhandled size");
 		}
 		break;
 	case PLACE_FRAME:
-		switch (dest->kind) {
-		case PLACE_REG:
-			total += mov_disp8_r64_m64(buf ? buf + total : NULL, dest->l.reg, RBP, -src->l.off);
+		switch (src->size) {
+		case 8:
+			switch (dest->kind) {
+			case PLACE_REG:
+				total += mov_disp8_r64_m64(buf ? buf + total : NULL, dest->l.reg, RBP, -src->l.off);
+				break;
+			default:
+				die("place_move: unhandled dest case for PLACE_FRAME");
+			}
+			break;
+		case 4:
+			switch (dest->kind) {
+			case PLACE_REG:
+				total += mov_disp8_r32_m32(buf ? buf + total : NULL, dest->l.reg, RBP, -src->l.off);
+				break;
+			default:
+				die("place_move: unhandled dest case for PLACE_FRAME");
+			}
 			break;
 		default:
-			die("place_move: unhandled dest case for PLACE_FRAME");
+			die("place_move: FRAME: src unhandled size");
 		}
 		break;
 	case PLACE_ABS:
-		switch (dest->kind) {
-		case PLACE_REG:
-			total += mov_r64_m64(buf ? buf + total : NULL, dest->l.reg, src->l.addr);
+		switch(src->size) {
+		case 8:
+			switch (dest->kind) {
+			case PLACE_REG:
+				total += mov_r64_m64(buf ? buf + total : NULL, dest->l.reg, src->l.addr);
+				break;
+			default:
+				die("place_move: unhandled dest case for PLACE_ABS");
+			}
+			break;
+		case 4:
+			switch (dest->kind) {
+			case PLACE_REG:
+				total += mov_r32_m32(buf ? buf + total : NULL, dest->l.reg, src->l.addr);
+				break;
+			default:
+				die("place_move: unhandled dest case for PLACE_ABS");
+			}
 			break;
 		default:
-			die("place_move: unhandled dest case for PLACE_ABS");
+			die("place_move: ABS: src unhandled size");
 		}
 		break;
 	default:
@@ -313,7 +377,7 @@ gencall(char *buf, size_t addr, struct expr *expr)
 	if (params->len > 7)
 		error(expr->start->line, expr->start->col, "syscall can take at most 7 parameters");
 
-	struct place place = {PLACE_REG, .l.reg = getreg()};
+	struct place place = {PLACE_REG, .size = 8, .l.reg = getreg()};
 
 	for (int i = 0; i < params->len; i++) {
 		len += genexpr(buf ? buf + len : NULL, params->data[i], &place);
@@ -334,7 +398,7 @@ gensyscall(char *buf, struct expr *expr, struct place *place)
 	unsigned short pushed = 0;
 	size_t len = 0;
 	struct fparams *params = &expr->d.call.params;
-	struct place reg = { .kind = PLACE_REG };
+	struct place reg = { .kind = PLACE_REG, .size = 8 };
 	if (params->len > 7)
 		error(expr->start->line, expr->start->col, "syscall can take at most 7 parameters");
 
@@ -378,7 +442,7 @@ genexpr(char *buf, size_t idx, struct place *out)
 	struct expr *expr = &exprs.data[idx];
 
 	if (expr->kind == EXPR_LIT) {
-		struct place src = {PLACE_REG, .l.reg = getreg()};
+		struct place src = {PLACE_REG, .size = 8, .l.reg = getreg()};
 		switch (expr->class) {
 		case C_INT:
 			total += mov_r64_imm(buf ? buf + total : buf, src.l.reg, expr->d.v.v.i64);
@@ -396,10 +460,10 @@ genexpr(char *buf, size_t idx, struct place *out)
 		freereg(src.l.reg);
 	} else if (expr->kind == EXPR_BINARY) {
 		total += genexpr(buf ? buf + total : buf, expr->left, out);
-		struct place place2 = { PLACE_REG, .l.reg = getreg() };
+		struct place place2 = { PLACE_REG, .size = 8, .l.reg = getreg() };
 		total += genexpr(buf ? buf + total : buf, expr->right, &place2);
 
-		struct place regbuf = { PLACE_REG, .l.reg = getreg() };
+		struct place regbuf = { PLACE_REG, .size = 8, .l.reg = getreg() };
 
 		total += place_move(buf ? buf + total : buf, &regbuf, out);
 
@@ -448,7 +512,7 @@ genexpr(char *buf, size_t idx, struct place *out)
 		struct expr *binary = &exprs.data[expr->d.cond.cond];
 		// FIXME this should go away
 		assert(binary->kind == EXPR_BINARY);
-		struct place tempplace = {PLACE_REG, .l.reg = getreg()};
+		struct place tempplace = {PLACE_REG, .size = 8, .l.reg = getreg()};
 		total += genexpr(buf ? buf + total : NULL, expr->d.cond.cond, &tempplace);
 		size_t iflen = genblock(NULL, &expr->d.cond.bif, false) + jmp(NULL, 0);
 		size_t elselen = genblock(NULL, &expr->d.cond.belse, false);
@@ -505,7 +569,7 @@ genblock(char *buf, struct block *block, bool toplevel)
 	for (int i = 0; i < block->len; i++) {
 		struct item *item = &block->data[i];
 		if (item->kind == ITEM_EXPR) {
-			struct place tempout = {PLACE_REG, .l.reg = getreg()};
+			struct place tempout = {PLACE_REG, .size = 8, .l.reg = getreg()};
 			total += genexpr(buf ? buf + total : NULL, item->idx, &tempout);
 			freereg(tempout.l.reg);
 		} else if (item->kind == ITEM_DECL) {
@@ -523,7 +587,7 @@ genblock(char *buf, struct block *block, bool toplevel)
 					evalexpr(decl);
 				}
 			} else {
-				struct place tempout = {PLACE_REG, .l.reg = getreg()};
+				struct place tempout = {PLACE_REG, .size = 8, .l.reg = getreg()};
 				total += genexpr(buf ? buf + total : NULL, block->decls.data[item->idx].val, &tempout);
 				total += place_move(buf ? buf + total : NULL, &decl->place, &tempout);
 				freereg(tempout.l.reg);
@@ -544,7 +608,7 @@ genblock(char *buf, struct block *block, bool toplevel)
 				error(assgn->start->line, assgn->start->col, "reassignment of procedure not allowed (yet)");
 			}
 
-			struct place tempout = {PLACE_REG, .l.reg = getreg()};
+			struct place tempout = {PLACE_REG, .size = 8, .l.reg = getreg()};
 			total += genexpr(buf ? buf + total : NULL, assgn->val, &tempout);
 			total += place_move(buf ? buf + total : NULL, &decl->place, &tempout);
 			freereg(tempout.l.reg);

@@ -185,6 +185,17 @@ mov_mr64_r64(char *buf, enum reg dest, enum reg src)
 }
 
 size_t
+mov_mr32_r32(char *buf, enum reg dest, enum reg src)
+{
+	if (buf) {
+		*(buf++) = 0x8B;
+		*(buf++) = (MOD_INDIRECT << 6) | (src << 3) | dest;
+	}
+
+	return 2;
+}
+
+size_t
 mov_r64_mr64(char *buf, enum reg dest, enum reg src)
 {
 	if (buf) {
@@ -197,6 +208,17 @@ mov_r64_mr64(char *buf, enum reg dest, enum reg src)
 }
 
 size_t
+mov_r32_mr32(char *buf, enum reg dest, enum reg src)
+{
+	if (buf) {
+		*(buf++) = 0x89;
+		*(buf++) = (MOD_INDIRECT << 6) | (dest << 3) | src;
+	}
+
+	return 2;
+}
+
+size_t
 mov_r64_r64(char *buf, enum reg dest, enum reg src)
 {
 	if (buf) {
@@ -206,6 +228,18 @@ mov_r64_r64(char *buf, enum reg dest, enum reg src)
 	}
 
 	return 3;
+}
+
+size_t
+mov_r32_r32(char *buf, enum reg dest, enum reg src)
+{
+	if (buf) {
+		if (src >= 8 || dest >= 8) *(buf++) = (src >= 8 ? REX_R : 0) | (dest >= 8 ? REX_B : 0);
+		*(buf++) = 0x89;
+		*(buf++) = (MOD_DIRECT << 6) | (src << 3) | dest;
+	}
+
+	return (src >= 8 || dest >= 8) ? 3 : 2;
 }
 
 size_t
@@ -229,7 +263,7 @@ mov_disp8_m32_r32(char *buf, enum reg dest, int8_t disp, enum reg src)
 	assert(src != 4);
 	if (buf) {
 		*(buf++) = 0x89;
-		*(buf++) = (MOD_DISP8 << 6) | (dest << 3) | src;
+		*(buf++) = (MOD_DISP8 << 6) | (src << 3) | dest;
 		*(buf++) = disp;
 	}
 
