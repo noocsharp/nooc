@@ -161,12 +161,14 @@ parseexpr(struct block *block)
 			parsenametypes(&expr.d.proc.in);
 			if (tok->type == TOK_LPAREN)
 				parsenametypes(&expr.d.proc.out);
+
 			for (int i = expr.d.proc.in.len - 1; i >= 0; i--) {
 				decl.s = expr.d.proc.in.data[i].name;
 				decl.type = expr.d.proc.in.data[i].type;
+				decl.place.kind = PLACE_FRAME;
 				type = &types.data[decl.type];
 				offset += type->size;
-				decl.loc.off = -offset - 8;
+				decl.place.l.off = -offset - 8;
 				array_add((&expr.d.proc.block.decls), decl);
 			}
 
@@ -176,7 +178,7 @@ parseexpr(struct block *block)
 				decl.declared = true;
 				type = &types.data[decl.type];
 				offset += type->size;
-				decl.loc.off = -offset;
+				decl.place.l.off = -offset;
 				array_add((&expr.d.proc.block.decls), decl);
 			}
 			parseblock(&expr.d.proc.block);

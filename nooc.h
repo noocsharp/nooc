@@ -105,19 +105,27 @@ struct assgns {
 	struct assgn *data;
 };
 
+struct place {
+	enum {
+		PLACE_ABS = 1,
+		PLACE_FRAME,
+		PLACE_STACK,
+		PLACE_REG,
+		PLACE_REGADDR,
+	} kind;
+	union {
+		size_t addr;
+		int64_t off;
+		int reg;
+	} l;
+};
+
 struct decl {
 	struct slice s;
 	size_t type;
 	size_t val; // struct exprs
 	bool declared;
-	enum {
-		DECL_STACK,
-		DECL_DATA
-	} kind;
-	union {
-		int64_t off;
-		size_t addr;
-	} loc;
+	struct place place;
 	struct token *start;
 };
 
@@ -223,13 +231,4 @@ struct exprs {
 	size_t cap;
 	size_t len;
 	struct expr *data;
-};
-
-struct out {
-	enum {
-		OUT_REG,
-		OUT_ADDR,
-		OUT_IGNORE,
-	} kind;
-	int reg;
 };
