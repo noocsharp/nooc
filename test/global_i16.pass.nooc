@@ -1,0 +1,9 @@
+let a i16 = 300
+
+let main proc() = proc() {
+	if = a 300 {
+		syscall(60, 0)
+	} else {
+		syscall(60, 1)
+	}
+}
