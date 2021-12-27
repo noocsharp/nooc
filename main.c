@@ -20,29 +20,10 @@
 #include "map.h"
 #include "blockstack.h"
 
+extern const char *const tokenstr[];
+
 extern struct block *blockstack[BLOCKSTACKSIZE];
 extern size_t blocki;
-
-const char *const tokenstr[] = {
-	[TOK_NONE] = "TOK_NONE",
-	[TOK_NAME] = "TOK_NAME",
-	[TOK_LPAREN] = "TOK_LPAREN",
-	[TOK_RPAREN] = "TOK_RPAREN",
-	[TOK_LCURLY] = "TOK_LCURLY",
-	[TOK_RCURLY] = "TOK_RCURLY",
-	[TOK_PLUS] = "TOK_PLUS",
-	[TOK_MINUS] = "TOK_MINUS",
-	[TOK_GREATER] = "TOK_GREATER",
-	[TOK_COMMA] = "TOK_COMMA",
-	[TOK_EQUAL] = "TOK_EQUAL",
-	[TOK_NUM] = "TOK_NUM",
-	[TOK_STRING] = "TOK_STRING",
-	[TOK_LET] = "TOK_LET",
-	[TOK_IF] = "TOK_IF",
-	[TOK_ELSE] = "TOK_ELSE",
-	[TOK_LOOP] = "TOK_LOOP",
-	[TOK_RETURN] = "TOK_RETURN",
-};
 
 struct map *typesmap;
 struct assgns assgns;
@@ -274,96 +255,6 @@ place_move(char *buf, struct place *dest, struct place *src)
 	}
 
 	return total;
-}
-
-char *exprkind_str(enum exprkind kind)
-{
-	switch (kind) {
-	case EXPR_LIT:
-		return "EXPR_LIT";
-	case EXPR_BINARY:
-		return "EXPR_BINARY";
-	case EXPR_IDENT:
-		return "EXPR_IDENT";
-	case EXPR_FCALL:
-		return "EXPR_FCALL";
-	case EXPR_COND:
-		return "EXPR_COND";
-	default:
-		die("invalid exprkind");
-	}
-
-	return NULL;
-}
-
-struct exprs exprs;
-
-void
-dumpval(struct expr *e)
-{
-	switch (e->class) {
-	case C_INT:
-		fprintf(stderr, "%ld", e->d.v.v.i64);
-		break;
-	case C_STR:
-		fprintf(stderr, "\"%.*s\"", (int)e->d.v.v.s.len, e->d.v.v.s.data);
-		break;
-	case C_PROC:
-		fprintf(stderr, "proc with %lu params", e->d.proc.in.len);
-		break;
-	}
-}
-
-void
-dumpbinop(enum binop op)
-{
-	switch (op) {
-	case OP_PLUS:
-		fprintf(stderr, "OP_PLUS");
-		break;
-	case OP_MINUS:
-		fprintf(stderr, "OP_MINUS");
-		break;
-	case OP_GREATER:
-		fprintf(stderr, "OP_GREATER");
-		break;
-	case OP_EQUAL:
-		fprintf(stderr, "OP_EQUAL");
-		break;
-	default:
-		die("invalid binop");
-	}
-}
-
-void
-dumpexpr(int indent, struct expr *expr)
-{
-	for (int i = 0; i < indent; i++)
-		fputc(' ', stderr);
-	fprintf(stderr, "%s: ", exprkind_str(expr->kind));
-	switch (expr->kind) {
-	case EXPR_IDENT:
-		fprintf(stderr, "%.*s\n", (int)expr->d.s.len, expr->d.s.data);
-		break;
-	case EXPR_LIT:
-		dumpval(expr);
-		fputc('\n', stderr);
-		break;
-	case EXPR_BINARY:
-		dumpbinop(expr->d.op);
-		fputc('\n', stderr);
-		dumpexpr(indent + 8, &exprs.data[expr->left]);
-		dumpexpr(indent + 8, &exprs.data[expr->right]);
-		break;
-	case EXPR_COND:
-		dumpexpr(indent + 8, &exprs.data[expr->d.cond.cond]);
-		break;
-	case EXPR_FCALL:
-		fprintf(stderr, "%.*s\n", (int)expr->d.call.name.len, expr->d.call.name.data);
-		break;
-	default:
-		die("dumpexpr: bad expression");
-	}
 }
 
 void
