@@ -276,8 +276,6 @@ place_move(char *buf, struct place *dest, struct place *src)
 	return total;
 }
 
-struct block *curitems;
-
 char *exprkind_str(enum exprkind kind)
 {
 	switch (kind) {
