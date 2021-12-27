@@ -41,20 +41,6 @@ finddecl(struct slice s)
 	return NULL;
 }
 
-struct nametype *
-findparam(struct nametypes *params, struct slice s)
-{
-	struct nametype *param;
-	for (int i = 0; i < params->len; i++) {
-		param = &(params->data[i]);
-		if (slice_cmp(&s, &param->name) == 0) {
-			return param;
-		}
-	}
-
-	return NULL;
-}
-
 static void
 expect(enum tokentype type)
 {
