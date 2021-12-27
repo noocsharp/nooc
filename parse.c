@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -84,6 +85,27 @@ parsestring(struct expr *expr)
 			array_add((&expr->d.v.v.s), str.data[i]);
 		}
 	}
+	tok = tok->next;
+}
+
+static void
+parsenum(struct expr *expr)
+{
+	expr->start = tok;
+	expr->kind = EXPR_LIT;
+	expr->class = C_INT;
+
+	errno = 0;
+	if (sizeof(long) == 8)
+		expr->d.v.v.i64 = strtol(tok->slice.data, NULL, 10);
+	else if (sizeof(long long) == 8)
+		expr->d.v.v.i64 = strtoll(tok->slice.data, NULL, 10);
+	else
+		die("parsenum: unhandled long size");
+
+	if (errno)
+		error(tok->line, tok->col, "failed to parse number");
+
 	tok = tok->next;
 }
 
@@ -212,11 +234,7 @@ parseexpr(struct block *block)
 		}
 		break;
 	case TOK_NUM:
-		expr.kind = EXPR_LIT;
-		expr.class = C_INT;
-		// FIXME: error check
-		expr.d.v.v.i64 = strtol(tok->slice.data, NULL, 10);
-		tok = tok->next;
+		parsenum(&expr);
 		break;
 	case TOK_EQUAL:
 		expr.kind = EXPR_BINARY;
