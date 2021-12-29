@@ -415,26 +415,26 @@ genexpr(char *buf, size_t idx, struct place *out)
 		total += place_move(buf ? buf + total : NULL, out, &src);
 		freereg(src.l.reg);
 	} else if (expr->kind == EXPR_BINARY) {
-		total += genexpr(buf ? buf + total : buf, expr->left, out);
+		total += genexpr(buf ? buf + total : buf, expr->d.bop.left, out);
 		struct place place2 = { PLACE_REG, .size = 8, .l.reg = getreg() };
-		total += genexpr(buf ? buf + total : buf, expr->right, &place2);
+		total += genexpr(buf ? buf + total : buf, expr->d.bop.right, &place2);
 
 		struct place regbuf = { PLACE_REG, .size = 8, .l.reg = getreg() };
 
 		total += place_move(buf ? buf + total : buf, &regbuf, out);
 
 		// FIXME: abstract these to act on places, so that we can generate more efficient code
-		switch (expr->d.op) {
-		case OP_PLUS: {
+		switch (expr->d.bop.kind) {
+		case BOP_PLUS: {
 			total += add_r64_r64(buf ? buf + total : buf, regbuf.l.reg, place2.l.reg);
 			break;
 		}
-		case OP_MINUS: {
+		case BOP_MINUS: {
 			total += sub_r64_r64(buf ? buf + total : buf, regbuf.l.reg, place2.l.reg);
 			break;
 		}
-		case OP_EQUAL:
-		case OP_GREATER: {
+		case BOP_EQUAL:
+		case BOP_GREATER: {
 			total += cmp_r64_r64(buf ? buf + total : buf, regbuf.l.reg, place2.l.reg);
 			break;
 		}
@@ -473,11 +473,11 @@ genexpr(char *buf, size_t idx, struct place *out)
 		total += genexpr(buf ? buf + total : NULL, expr->d.cond.cond, &tempplace);
 		size_t iflen = genblock(NULL, &expr->d.cond.bif, false) + jmp(NULL, 0);
 		size_t elselen = genblock(NULL, &expr->d.cond.belse, false);
-		switch (binary->d.op) {
-		case OP_GREATER:
+		switch (binary->d.bop.kind) {
+		case BOP_GREATER:
 			total += jng(buf ? buf + total : NULL, iflen);
 			break;
-		case OP_EQUAL:
+		case BOP_EQUAL:
 			total += jne(buf ? buf + total : NULL, iflen);
 			break;
 		default:

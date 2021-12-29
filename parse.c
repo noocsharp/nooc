@@ -238,27 +238,27 @@ parseexpr(struct block *block)
 		break;
 	case TOK_EQUAL:
 		expr.kind = EXPR_BINARY;
-		expr.d.op = OP_EQUAL;
+		expr.d.bop.kind = BOP_EQUAL;
 		goto binary_common;
 	case TOK_GREATER:
 		expr.kind = EXPR_BINARY;
-		expr.d.op = OP_GREATER;
+		expr.d.bop.kind = BOP_GREATER;
 		goto binary_common;
 	case TOK_PLUS:
 		expr.kind = EXPR_BINARY;
-		expr.d.op = OP_PLUS;
+		expr.d.bop.kind = BOP_PLUS;
 		goto binary_common;
 	case TOK_MINUS:
 		expr.kind = EXPR_BINARY;
-		expr.d.op = OP_MINUS;
+		expr.d.bop.kind = BOP_MINUS;
 binary_common:
 		expr.start = tok;
 		tok = tok->next;
-		expr.left = parseexpr(block);
-		expr.right = parseexpr(block);
-		if (exprs.data[expr.left].class != exprs.data[expr.right].class)
+		expr.d.bop.left = parseexpr(block);
+		expr.d.bop.right = parseexpr(block);
+		if (exprs.data[expr.d.bop.left].class != exprs.data[expr.d.bop.right].class)
 			error(tok->line, tok->col, "expected binary expression operands to be of same class");
-		expr.class = exprs.data[expr.left].class;
+		expr.class = exprs.data[expr.d.bop.left].class;
 		break;
 	case TOK_STRING:
 		parsestring(&expr);

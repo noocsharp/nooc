@@ -181,11 +181,15 @@ struct proc {
 	struct block block;
 };
 
-enum binop {
-	OP_PLUS,
-	OP_MINUS,
-	OP_GREATER,
-	OP_EQUAL,
+struct binop {
+	enum {
+		BOP_PLUS,
+		BOP_MINUS,
+		BOP_GREATER,
+		BOP_EQUAL,
+	} kind;
+	size_t left;
+	size_t right;
 };
 
 struct value {
@@ -217,15 +221,13 @@ struct expr {
 	enum class class;
 	union {
 		struct value v;
-		enum binop op;
+		struct binop bop;
 		struct slice s;
 		struct fcall call;
 		struct cond cond;
 		struct loop loop;
 		struct proc proc;
 	} d;
-	size_t left;
-	size_t right;
 	struct token *start;
 };
 

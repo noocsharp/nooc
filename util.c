@@ -71,20 +71,20 @@ dumpval(struct expr *e)
 }
 
 void
-dumpbinop(enum binop op)
+dumpbinop(struct binop *op)
 {
-	switch (op) {
-	case OP_PLUS:
-		fprintf(stderr, "OP_PLUS");
+	switch (op->kind) {
+	case BOP_PLUS:
+		fprintf(stderr, "BOP_PLUS");
 		break;
-	case OP_MINUS:
-		fprintf(stderr, "OP_MINUS");
+	case BOP_MINUS:
+		fprintf(stderr, "BOP_MINUS");
 		break;
-	case OP_GREATER:
-		fprintf(stderr, "OP_GREATER");
+	case BOP_GREATER:
+		fprintf(stderr, "BOP_GREATER");
 		break;
-	case OP_EQUAL:
-		fprintf(stderr, "OP_EQUAL");
+	case BOP_EQUAL:
+		fprintf(stderr, "BOP_EQUAL");
 		break;
 	default:
 		die("invalid binop");
@@ -106,10 +106,10 @@ dumpexpr(int indent, struct expr *expr)
 		fputc('\n', stderr);
 		break;
 	case EXPR_BINARY:
-		dumpbinop(expr->d.op);
+		dumpbinop(&expr->d.bop);
 		fputc('\n', stderr);
-		dumpexpr(indent + 8, &exprs.data[expr->left]);
-		dumpexpr(indent + 8, &exprs.data[expr->right]);
+		dumpexpr(indent + 8, &exprs.data[expr->d.bop.left]);
+		dumpexpr(indent + 8, &exprs.data[expr->d.bop.right]);
 		break;
 	case EXPR_COND:
 		dumpexpr(indent + 8, &exprs.data[expr->d.cond.cond]);
