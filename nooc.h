@@ -16,6 +16,8 @@ enum tokentype {
 	TOK_MINUS,
 	TOK_GREATER,
 
+	TOK_DOLLAR,
+
 	TOK_COMMA,
 	TOK_EQUAL,
 
@@ -192,6 +194,13 @@ struct binop {
 	size_t right;
 };
 
+struct unop {
+	enum {
+		UOP_REF,
+	} kind;
+	size_t expr;
+};
+
 struct value {
 	union {
 		int64_t i64;
@@ -204,6 +213,7 @@ enum exprkind {
 	EXPR_LIT,
 	EXPR_IDENT,
 	EXPR_BINARY,
+	EXPR_UNARY,
 	EXPR_FCALL,
 	EXPR_COND,
 	EXPR_LOOP,
@@ -212,6 +222,7 @@ enum exprkind {
 
 enum class {
 	C_INT = 1,
+	C_REF,
 	C_STR,
 	C_PROC,
 };
@@ -222,6 +233,7 @@ struct expr {
 	union {
 		struct value v;
 		struct binop bop;
+		struct unop uop;
 		struct slice s;
 		struct fcall call;
 		struct cond cond;

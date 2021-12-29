@@ -446,6 +446,24 @@ genexpr(char *buf, size_t idx, struct place *out)
 
 		total += place_move(buf ? buf + total : buf, out, &regbuf);
 		freereg(regbuf.l.reg);
+	} else if (expr->kind == EXPR_UNARY) {
+		assert(expr->d.uop.kind == UOP_REF);
+		struct expr *ident = &exprs.data[expr->d.uop.expr];
+		assert(ident->kind == EXPR_IDENT);
+		struct decl *decl = finddecl(ident->d.s);
+		assert(decl->place.kind == PLACE_ABS);
+		struct place src = { .kind = PLACE_REG, .l.reg = getreg(), .size = 8 };
+
+		switch (decl->place.kind) {
+		case PLACE_ABS:
+			total += mov_r64_imm(buf ? buf + total : NULL, src.l.reg, decl->place.l.addr);
+			total += place_move(buf ? buf + total : NULL, out, &src);
+			break;
+		default:
+			die("genexpr: unhandled place kind for EXPR_UNARY");
+		}
+
+		freereg(src.l.reg);
 	} else if (expr->kind == EXPR_IDENT) {
 		struct decl *decl = finddecl(expr->d.s);
 		if (decl == NULL) {

@@ -64,6 +64,9 @@ dumpval(struct expr *e)
 	case C_STR:
 		fprintf(stderr, "\"%.*s\"", (int)e->d.v.v.s.len, e->d.v.v.s.data);
 		break;
+	case C_REF:
+		fprintf(stderr, "a reference");
+		break;
 	case C_PROC:
 		fprintf(stderr, "proc with %lu params", e->d.proc.in.len);
 		break;

@@ -263,6 +263,14 @@ binary_common:
 	case TOK_STRING:
 		parsestring(&expr);
 		break;
+	case TOK_DOLLAR:
+		expr.start = tok;
+		expr.kind = EXPR_UNARY;
+		expr.class = C_REF;
+		expr.d.uop.kind = UOP_REF;
+		tok = tok->next;
+		expr.d.uop.expr = parseexpr(block);
+		break;
 	default:
 		error(tok->line, tok->col, "invalid token for expression");
 	}
