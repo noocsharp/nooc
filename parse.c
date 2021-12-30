@@ -2,7 +2,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "nooc.h"
 #include "parse.h"
@@ -310,7 +309,7 @@ parsetype()
 	struct mapkey key;
 	union mapval val;
 
-	if (strncmp(tok->slice.data, "proc", 3) == 0) {
+	if (slice_cmplit(&tok->slice, "proc") == 0) {
 		type.class = TYPE_PROC;
 		tok = tok->next;
 
