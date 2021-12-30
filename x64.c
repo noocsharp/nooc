@@ -460,6 +460,20 @@ mov_disp8_r8_m8(char *buf, enum reg dest, enum reg src, int8_t disp)
 }
 
 size_t
+lea_disp8(char *buf, enum reg dest, enum reg src, int8_t disp)
+{
+	assert(src != 4);
+	if (buf) {
+		*(buf++) = REX_W;
+		*(buf++) = 0x8d;
+		*(buf++) = (MOD_DISP8 << 6) | (dest << 3) | src;
+		*(buf++) = disp;
+	}
+
+	return 4;
+}
+
+size_t
 add_r64_r64(char *buf, enum reg dest, enum reg src)
 {
 	if (buf) {

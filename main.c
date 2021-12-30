@@ -451,12 +451,15 @@ genexpr(char *buf, size_t idx, struct place *out)
 		struct expr *ident = &exprs.data[expr->d.uop.expr];
 		assert(ident->kind == EXPR_IDENT);
 		struct decl *decl = finddecl(ident->d.s);
-		assert(decl->place.kind == PLACE_ABS);
 		struct place src = { .kind = PLACE_REG, .l.reg = getreg(), .size = 8 };
 
 		switch (decl->place.kind) {
 		case PLACE_ABS:
 			total += mov_r64_imm(buf ? buf + total : NULL, src.l.reg, decl->place.l.addr);
+			total += place_move(buf ? buf + total : NULL, out, &src);
+			break;
+		case PLACE_FRAME:
+			total += lea_disp8(buf ? buf + total : NULL, src.l.reg, RBP, -decl->place.l.off);
 			total += place_move(buf ? buf + total : NULL, out, &src);
 			break;
 		default:

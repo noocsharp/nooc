@@ -50,6 +50,7 @@ size_t mov_disp8_r64_m64(char *buf, enum reg dest, enum reg src, int8_t disp);
 size_t mov_disp8_r32_m32(char *buf, enum reg dest, enum reg src, int8_t disp);
 size_t mov_disp8_r16_m16(char *buf, enum reg dest, enum reg src, int8_t disp);
 size_t mov_disp8_r8_m8(char *buf, enum reg dest, enum reg src, int8_t disp);
+size_t lea_disp8(char *buf, enum reg dest, enum reg src, int8_t disp);
 size_t add_r64_r64(char *buf, enum reg reg1, enum reg reg2);
 size_t sub_r64_r64(char *buf, enum reg reg1, enum reg reg2);
 size_t sub_r64_imm(char *buf, enum reg reg1, int32_t imm);
