@@ -83,6 +83,10 @@ hashtype(struct type *type, uint8_t *out)
 	case TYPE_PROC:
 		blake3_update(&b3, type->d.params.in.data, type->d.params.in.len * sizeof(*type->d.params.in.data));
 		blake3_update(&b3, type->d.params.out.data, type->d.params.out.len * sizeof(*type->d.params.out.data));
+		break;
+	case TYPE_ARRAY:
+		blake3_update(&b3, &type->d.arr, sizeof(type->d.arr));
+		break;
 	default:
 	}
 

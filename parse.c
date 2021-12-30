@@ -115,7 +115,10 @@ typetoclass(struct type *type)
 	case TYPE_INT:
 		return C_INT;
 	case TYPE_STR:
+	case TYPE_ARRAY:
 		return C_STR;
+	case TYPE_REF:
+		return C_REF;
 	default:
 		die("unknown type class");
 	}
@@ -287,8 +290,6 @@ parsetypelist(struct typelist *list)
 	size_t type;
 
 	while (tok->type != TOK_RPAREN) {
-		expect(TOK_NAME);
-
 		type = parsetype();
 		array_add(list, type);
 
@@ -309,13 +310,36 @@ parsetype()
 	struct mapkey key;
 	union mapval val;
 
-	if (slice_cmplit(&tok->slice, "proc") == 0) {
+	if (tok->type == TOK_NAME && slice_cmplit(&tok->slice, "proc") == 0) {
 		type.class = TYPE_PROC;
 		tok = tok->next;
 
 		parsetypelist(&type.d.params.in);
 		if (tok->type == TOK_LPAREN)
 			parsetypelist(&type.d.params.out);
+	} else if (tok->type == TOK_DOLLAR) {
+		type.class = TYPE_REF;
+		type.size = 8;
+		tok = tok->next;
+
+		type.d.subtype = parsetype();
+	} else if (tok->type == TOK_LSQUARE) {
+		struct expr len = { 0 };
+		type.class = TYPE_ARRAY;
+		type.size = 0;
+		tok = tok->next;
+
+		expect(TOK_NUM);
+		parsenum(&len);
+
+		if (len.d.v.v.i64 <= 0)
+			error(tok->line, tok->col, "expected positive integer for array size");
+		type.d.arr.len = len.d.v.v.i64;
+
+		expect(TOK_RSQUARE);
+		tok = tok->next;
+
+		type.d.arr.subtype = parsetype();
 	} else {
 		mapkey(&key, tok->slice.data, tok->slice.len);
 		val = mapget(typesmap, &key);

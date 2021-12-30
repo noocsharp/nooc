@@ -63,7 +63,12 @@ decl_alloc(struct block *block, struct decl *decl)
 	decl->place.size = type->size;
 	switch (decl->place.kind) {
 	case PLACE_ABS:
-		decl->place.l.addr = data_pushzero(type->size);
+		if (type->class == TYPE_ARRAY) {
+			struct type *subtype = &types.data[type->d.arr.subtype];
+			decl->place.l.addr = data_pushzero(subtype->size * type->d.arr.len);
+		} else {
+			decl->place.l.addr = data_pushzero(type->size);
+		}
 		break;
 	case PLACE_FRAME:
 		decl->place.l.off = block->datasize;
@@ -77,6 +82,8 @@ decl_alloc(struct block *block, struct decl *decl)
 size_t
 place_move(char *buf, struct place *dest, struct place *src)
 {
+	assert(dest->size != 0);
+	assert(src->size != 0);
 	size_t total = 0;
 	switch (src->kind) {
 	case PLACE_REG:
@@ -280,6 +287,7 @@ typecheck(struct block *block)
 			col = assgn->start->col;
 			goto check;
 		case ITEM_DECL:
+			// FIXME: typecheck procedure parameters
 			decl = &block->decls.data[item->idx];
 			type = &types.data[decl->type];
 			expr = &exprs.data[decl->val];
@@ -292,10 +300,10 @@ check:
 					error(line, col, "expected integer expression for integer declaration");
 				break;
 			case TYPE_STR:
+			case TYPE_ARRAY:
 				if (expr->class != C_STR)
-					error(line, col, "expected string expression for string declaration");
+					error(line, col, "expected string expression for array declaration");
 				break;
-
 			case TYPE_PROC:
 				if (expr->class != C_PROC)
 					error(line, col, "expected proc expression for proc declaration");
@@ -529,7 +537,7 @@ evalexpr(struct decl *decl)
 			break;
 		case C_STR: {
 			uint64_t addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
-			decl_set(decl, &addr);
+			decl->place.l.addr = addr;
 			break;
 		}
 		default:

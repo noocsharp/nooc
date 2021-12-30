@@ -68,6 +68,12 @@ lex(struct slice start)
 		} else if (*start.data == ')') {
 			cur->type = TOK_RPAREN;
 			ADVANCE(1);
+		} else if (*start.data == '[') {
+			cur->type = TOK_LSQUARE;
+			ADVANCE(1);
+		} else if (*start.data == ']') {
+			cur->type = TOK_RSQUARE;
+			ADVANCE(1);
 		} else if (*start.data == '{') {
 			cur->type = TOK_LCURLY;
 			ADVANCE(1);

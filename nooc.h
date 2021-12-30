@@ -11,6 +11,8 @@ enum tokentype {
 	TOK_RPAREN,
 	TOK_LCURLY,
 	TOK_RCURLY,
+	TOK_LSQUARE,
+	TOK_RSQUARE,
 
 	TOK_PLUS,
 	TOK_MINUS,
@@ -64,6 +66,8 @@ struct typelist {
 enum typeclass {
 	TYPE_INT = 1,
 	TYPE_STR,
+	TYPE_ARRAY,
+	TYPE_REF,
 	TYPE_PROC,
 };
 
@@ -75,6 +79,11 @@ struct type {
 			struct typelist in;
 			struct typelist out;
 		} params;
+		struct {
+			size_t len;
+			size_t subtype; // struct types
+		} arr;
+		size_t subtype; // struct types
 	} d;
 };
 
