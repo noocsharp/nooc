@@ -1,4 +1,4 @@
-let exit proc(str) = proc(code i64) {
+let exit proc($i8) = proc(code i64) {
 	syscall(60, code)
 	return
 }

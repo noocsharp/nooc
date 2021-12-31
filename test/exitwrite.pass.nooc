@@ -1,5 +1,5 @@
-let write proc(i64, str, i64) (i64) = proc(fd i64, string str, len i64) (out i64) {
-	out = syscall(1, fd, string, len)
+let write proc(i64, $i8, i64) (i64) = proc(fd i64, data $i8, len i64) (out i64) {
+	out = syscall(1, fd, data, len)
 	return
 }
 

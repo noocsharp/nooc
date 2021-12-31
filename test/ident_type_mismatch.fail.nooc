@@ -1,4 +1,4 @@
 let main proc() = proc() {
 	let a i64 = 5
-	let b str = a
+	let b $i8 = a
 }

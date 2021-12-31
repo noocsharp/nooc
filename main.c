@@ -299,10 +299,13 @@ check:
 				if (expr->class != C_INT)
 					error(line, col, "expected integer expression for integer declaration");
 				break;
-			case TYPE_STR:
 			case TYPE_ARRAY:
 				if (expr->class != C_STR)
 					error(line, col, "expected string expression for array declaration");
+				break;
+			case TYPE_REF:
+				if (expr->class != C_REF)
+					error(line, col, "expected reference expression for reference declaration");
 				break;
 			case TYPE_PROC:
 				if (expr->class != C_PROC)

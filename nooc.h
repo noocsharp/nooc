@@ -64,8 +64,8 @@ struct typelist {
 };
 
 enum typeclass {
-	TYPE_INT = 1,
-	TYPE_STR,
+	TYPE_NONE,
+	TYPE_INT,
 	TYPE_ARRAY,
 	TYPE_REF,
 	TYPE_PROC,
