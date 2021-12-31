@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "nooc.h"
+#include "parse.h"
 #include "util.h"
 #include "type.h"
 #include "map.h"
@@ -14,6 +15,8 @@
 
 struct types types;
 extern struct map *typesmap;
+extern struct assgns assgns;
+extern struct exprs exprs;
 
 static struct typetable {
 	size_t cap, count;
@@ -158,4 +161,72 @@ type_put(struct type *type)
 	}
 
 	return table.vals[i];
+}
+
+void
+typecheck(struct block *block)
+{
+	for (size_t i = 0; i < block->len; i++) {
+		struct item *item = &block->data[i];
+		struct expr *expr;
+		struct decl *decl;
+		struct type *type;
+		struct assgn *assgn;
+		size_t line, col;
+		switch (block->data[i].kind) {
+		case ITEM_ASSGN:
+			assgn = &assgns.data[item->idx];
+			decl = finddecl(assgn->s);
+			if (decl == NULL)
+				error(assgn->start->line, assgn->start->col, "typecheck: unknown name '%.*s'", assgn->s.len, assgn->s.data);
+
+			type = &types.data[decl->type];
+			expr = &exprs.data[assgn->val];
+			line = assgn->start->line;
+			col = assgn->start->col;
+			goto check;
+		case ITEM_DECL:
+			// FIXME: typecheck procedure parameters
+			decl = &block->decls.data[item->idx];
+			type = &types.data[decl->type];
+			expr = &exprs.data[decl->val];
+			line = decl->start->line;
+			col = decl->start->col;
+check:
+			switch (type->class) {
+			case TYPE_INT:
+				if (expr->class != C_INT)
+					error(line, col, "expected integer expression for integer declaration");
+				break;
+			case TYPE_ARRAY:
+				if (expr->class != C_STR)
+					error(line, col, "expected string expression for array declaration");
+				break;
+			case TYPE_REF:
+				if (expr->class != C_REF)
+					error(line, col, "expected reference expression for reference declaration");
+				break;
+			case TYPE_PROC:
+				if (expr->class != C_PROC)
+					error(line, col, "expected proc expression for proc declaration");
+
+				if (expr->d.proc.in.len != type->d.params.in.len)
+					error(line, col, "procedure expression takes %u parameters, but declaration has type which takes %u", expr->d.proc.in.len, type->d.params.in.len);
+
+				for (size_t j = 0; j < expr->d.proc.in.len; j++) {
+					if (expr->d.proc.in.data[j].type != type->d.params.in.data[j])
+						error(line, col, "unexpected type for parameter %u in procedure declaration", j);
+				}
+				break;
+			default:
+				error(line, col, "unknown decl type");
+			}
+			break;
+		case ITEM_EXPR:
+		case ITEM_RETURN:
+			break;
+		default:
+			error(item->start->line, item->start->col, "unknown item type");
+		}
+	}
 }
