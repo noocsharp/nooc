@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -164,15 +165,100 @@ type_put(struct type *type)
 }
 
 void
+typecompat(size_t typei, size_t expri)
+{
+	struct type *type = &types.data[typei];
+	struct expr *expr = &exprs.data[expri];
+
+	switch (type->class) {
+	case TYPE_INT:
+		if (expr->class != C_INT)
+			error(expr->start->line, expr->start->col, "expected integer expression for integer declaration");
+		break;
+	case TYPE_ARRAY:
+		if (expr->class != C_STR)
+			error(expr->start->line, expr->start->col, "expected string expression for array declaration");
+		break;
+	case TYPE_REF:
+		if (expr->class != C_REF)
+			error(expr->start->line, expr->start->col, "expected reference expression for reference declaration");
+		break;
+	case TYPE_PROC:
+		if (expr->class != C_PROC)
+			error(expr->start->line, expr->start->col, "expected proc expression for proc declaration");
+
+		if (expr->d.proc.in.len != type->d.params.in.len)
+			error(expr->start->line, expr->start->col, "procedure expression takes %u parameters, but declaration has type which takes %u", expr->d.proc.in.len, type->d.params.in.len);
+
+		for (size_t j = 0; j < expr->d.proc.in.len; j++) {
+			if (expr->d.proc.in.data[j].type != type->d.params.in.data[j])
+				error(expr->start->line, expr->start->col, "unexpected type for parameter %u in procedure declaration", j);
+		}
+		break;
+	default:
+		error(expr->start->line, expr->start->col, "unknown decl type");
+	}
+}
+
+static void
+typecheckcall(struct expr *expr)
+{
+	assert(expr->kind == EXPR_FCALL);
+	struct decl *fdecl = finddecl(expr->d.call.name);
+
+	if (fdecl == NULL) {
+		if (slice_cmplit(&expr->d.call.name, "syscall") == 0) {
+			return;
+		} else {
+			error(expr->start->line, expr->start->col, "unknown function '%.*s'", expr->d.call.name.len, expr->d.call.name.data);
+		}
+	}
+
+	struct type *ftype = &types.data[fdecl->type];
+	assert(ftype->class == TYPE_PROC);
+
+	// should this throw an error instead and we move the check out of parsing?
+	assert(expr->d.call.params.len == ftype->d.params.in.len);
+	for (int i = 0; i < ftype->d.params.in.len; i++) {
+		typecompat(ftype->d.params.in.data[i], expr->d.call.params.data[i]);
+	}
+}
+
+static void
+typecheckexpr(size_t expri)
+{
+	struct expr *expr = &exprs.data[expri];
+	switch (expr->kind) {
+	case EXPR_BINARY:
+		typecheckexpr(expr->d.bop.left);
+		typecheckexpr(expr->d.bop.right);
+		break;
+	case EXPR_UNARY:
+		typecheckexpr(expr->d.bop.left);
+		break;
+	case EXPR_COND:
+		typecheckexpr(expr->d.cond.cond);
+		break;
+	case EXPR_LIT:
+	case EXPR_PROC:
+	case EXPR_LOOP:
+	case EXPR_IDENT:
+		break;
+	case EXPR_FCALL:
+		typecheckcall(expr);
+		break;
+	default:
+		die("typecheckexpr: bad expr kind");
+	}
+}
+
+void
 typecheck(struct block *block)
 {
 	for (size_t i = 0; i < block->len; i++) {
 		struct item *item = &block->data[i];
-		struct expr *expr;
 		struct decl *decl;
-		struct type *type;
 		struct assgn *assgn;
-		size_t line, col;
 		switch (block->data[i].kind) {
 		case ITEM_ASSGN:
 			assgn = &assgns.data[item->idx];
@@ -180,47 +266,13 @@ typecheck(struct block *block)
 			if (decl == NULL)
 				error(assgn->start->line, assgn->start->col, "typecheck: unknown name '%.*s'", assgn->s.len, assgn->s.data);
 
-			type = &types.data[decl->type];
-			expr = &exprs.data[assgn->val];
-			line = assgn->start->line;
-			col = assgn->start->col;
-			goto check;
+			typecheckexpr(assgn->val);
+			typecompat(decl->type, assgn->val);
+			break;
 		case ITEM_DECL:
-			// FIXME: typecheck procedure parameters
 			decl = &block->decls.data[item->idx];
-			type = &types.data[decl->type];
-			expr = &exprs.data[decl->val];
-			line = decl->start->line;
-			col = decl->start->col;
-check:
-			switch (type->class) {
-			case TYPE_INT:
-				if (expr->class != C_INT)
-					error(line, col, "expected integer expression for integer declaration");
-				break;
-			case TYPE_ARRAY:
-				if (expr->class != C_STR)
-					error(line, col, "expected string expression for array declaration");
-				break;
-			case TYPE_REF:
-				if (expr->class != C_REF)
-					error(line, col, "expected reference expression for reference declaration");
-				break;
-			case TYPE_PROC:
-				if (expr->class != C_PROC)
-					error(line, col, "expected proc expression for proc declaration");
-
-				if (expr->d.proc.in.len != type->d.params.in.len)
-					error(line, col, "procedure expression takes %u parameters, but declaration has type which takes %u", expr->d.proc.in.len, type->d.params.in.len);
-
-				for (size_t j = 0; j < expr->d.proc.in.len; j++) {
-					if (expr->d.proc.in.data[j].type != type->d.params.in.data[j])
-						error(line, col, "unexpected type for parameter %u in procedure declaration", j);
-				}
-				break;
-			default:
-				error(line, col, "unknown decl type");
-			}
+			typecheckexpr(decl->val);
+			typecompat(decl->type, decl->val);
 			break;
 		case ITEM_EXPR:
 		case ITEM_RETURN:

@@ -1,3 +1,5 @@
+let s [6]i8 = "hello\n"
+
 let write proc(i64, $i8, i64) (i64) = proc(fd i64, data $i8, len i64) (out i64) {
 	out = syscall(1, fd, data, len)
 	return
@@ -10,7 +12,7 @@ let exit proc(i64) = proc(code i64) {
 
 let main proc() = proc() {
 	let ret i64 = 0
-	ret = write(1, "hello\n", 6)
+	ret = write(1, $s, 6)
 	if = ret 6 {
 		exit(0)
 	} else {
