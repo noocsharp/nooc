@@ -358,27 +358,24 @@ genexpr(char *buf, size_t idx, struct place *out)
 		total += place_move(buf ? buf + total : NULL, out, &src);
 		freereg(src.l.reg);
 	} else if (expr->kind == EXPR_BINARY) {
-		total += genexpr(buf ? buf + total : buf, expr->d.bop.left, out);
+		struct place place1 = { PLACE_REG, .size = 8, .l.reg = getreg() };
+		total += genexpr(buf ? buf + total : buf, expr->d.bop.left, &place1);
 		struct place place2 = { PLACE_REG, .size = 8, .l.reg = getreg() };
 		total += genexpr(buf ? buf + total : buf, expr->d.bop.right, &place2);
-
-		struct place regbuf = { PLACE_REG, .size = 8, .l.reg = getreg() };
-
-		total += place_move(buf ? buf + total : buf, &regbuf, out);
 
 		// FIXME: abstract these to act on places, so that we can generate more efficient code
 		switch (expr->d.bop.kind) {
 		case BOP_PLUS: {
-			total += add_r64_r64(buf ? buf + total : buf, regbuf.l.reg, place2.l.reg);
+			total += add_r64_r64(buf ? buf + total : buf, place1.l.reg, place2.l.reg);
 			break;
 		}
 		case BOP_MINUS: {
-			total += sub_r64_r64(buf ? buf + total : buf, regbuf.l.reg, place2.l.reg);
+			total += sub_r64_r64(buf ? buf + total : buf, place1.l.reg, place2.l.reg);
 			break;
 		}
 		case BOP_EQUAL:
 		case BOP_GREATER: {
-			total += cmp_r64_r64(buf ? buf + total : buf, regbuf.l.reg, place2.l.reg);
+			total += cmp_r64_r64(buf ? buf + total : buf, place1.l.reg, place2.l.reg);
 			break;
 		}
 		default:
@@ -387,8 +384,8 @@ genexpr(char *buf, size_t idx, struct place *out)
 
 		freereg(place2.l.reg);
 
-		total += place_move(buf ? buf + total : buf, out, &regbuf);
-		freereg(regbuf.l.reg);
+		total += place_move(buf ? buf + total : buf, out, &place1);
+		freereg(place1.l.reg);
 	} else if (expr->kind == EXPR_UNARY) {
 		assert(expr->d.uop.kind == UOP_REF);
 		struct expr *ident = &exprs.data[expr->d.uop.expr];
