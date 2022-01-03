@@ -176,6 +176,16 @@ xmalloc(size_t size)
 }
 
 void *
+xrealloc(void *ptr, size_t size)
+{
+	char *p = realloc(ptr, size);
+	if (!p)
+		die("realloc failed!");
+
+	return p;
+}
+
+void *
 xcalloc(size_t nelem, size_t elsize)
 {
 	char *p = calloc(nelem, elsize);

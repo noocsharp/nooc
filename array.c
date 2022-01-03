@@ -1,7 +1,10 @@
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "nooc.h"
+#include "util.h"
 #include "array.h"
 
 int
@@ -13,11 +16,8 @@ _array_add(void **data, size_t *len, size_t *cap, void *new, size_t size, size_t
 		*cap = *cap ? *cap * 2 : 1;
 	}
 
-	if (need_realloc) {
-		*data = realloc(*data, size*(*cap));
-		if (*data == NULL)
-			return -1;
-	}
+	if (need_realloc)
+		*data = xrealloc(*data, size*(*cap));
 
 	memcpy((char *)*data + size*(*len), new, size*count);
 	*len += count;
@@ -35,11 +35,8 @@ _array_zero(void **data, size_t *len, size_t *cap, size_t count)
 		*cap = *cap ? *cap * 2 : 1;
 	}
 
-	if (need_realloc) {
-		*data = realloc(*data, *cap);
-		if (*data == NULL)
-			return -1;
-	}
+	if (need_realloc)
+		*data = xrealloc(*data, *cap);
 
 	memset((char *)*data + *len, 0, count);
 	*len += count;
