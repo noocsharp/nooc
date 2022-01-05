@@ -5,6 +5,7 @@
 
 #include "nooc.h"
 #include "x64.h"
+#include "ir.h"
 #include "util.h"
 
 enum rex {

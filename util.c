@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "nooc.h"
+#include "ir.h"
 #include "array.h"
 #include "util.h"
 
@@ -125,6 +126,77 @@ dumpexpr(int indent, struct expr *expr)
 	}
 }
 
+void
+dumpir(struct iproc *instrs)
+{
+	bool callarg = false;
+	for (int i = 0; i < instrs->len; i++) {
+		struct instr *instr = &instrs->data[i];
+		if (callarg && instr->op != IR_CALLARG) {
+			putc('\n', stderr);
+			callarg = false;
+		}
+
+		switch (instr->op) {
+		case IR_IN:
+			fprintf(stderr, "in %%%lu\n", instr->id);
+			break;
+		case IR_SIZE:
+			fprintf(stderr, "size %lu\n", instr->id);
+			break;
+		case IR_IMM:
+			fprintf(stderr, "imm %lu\n", instr->id);
+			break;
+		case IR_ASSIGN:
+			fprintf(stderr, "%%%lu = ", instr->id);
+			break;
+		case IR_ALLOC:
+			fprintf(stderr, "alloc %lu\n", instr->id);
+			break;
+		case IR_STORE:
+			fprintf(stderr, "store %%%lu", instr->id);
+			break;
+		case IR_LOAD:
+			fprintf(stderr, "load %%%lu\n", instr->id);
+			break;
+		case IR_ADD:
+			fprintf(stderr, "add %%%lu", instr->id);
+			break;
+		case IR_CEQ:
+			fprintf(stderr, "ceq %%%lu", instr->id);
+			break;
+		case IR_EXTRA:
+			fprintf(stderr, ", %%%lu\n", instr->id);
+			break;
+		case IR_CALLARG:
+			fprintf(stderr, ", %%%lu", instr->id);
+			break;
+		case IR_CALL:
+			callarg = true;
+			fprintf(stderr, "call $%lu", instr->id);
+			break;
+		case IR_RETURN:
+			fputs("return\n", stderr);
+			break;
+		case IR_CONDJUMP:
+			fprintf(stderr, "condjump :%lu", instr->id);
+			break;
+		case IR_JUMP:
+			fprintf(stderr, "jump :%lu\n", instr->id);
+			break;
+		case IR_LABEL:
+			fprintf(stderr, "label :%lu\n", instr->id);
+			break;
+		default:
+			fprintf(stderr, "%d\n", instr->op);
+			die("dumpir: unknown instruction");
+		}
+	}
+
+	if (callarg) putc('\n', stderr);
+
+	putc('\n', stderr);
+}
 
 int
 slice_cmp(struct slice *s1, struct slice *s2)

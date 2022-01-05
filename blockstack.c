@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "nooc.h"
+#include "ir.h"
 #include "util.h"
 
 struct block *blockstack[BLOCKSTACKSIZE];

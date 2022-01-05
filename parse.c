@@ -5,6 +5,7 @@
 
 #include "nooc.h"
 #include "parse.h"
+#include "ir.h"
 #include "util.h"
 #include "array.h"
 #include "type.h"
@@ -173,11 +174,8 @@ parseexpr(struct block *block)
 			for (int i = expr.d.proc.in.len - 1; i >= 0; i--) {
 				decl.s = expr.d.proc.in.data[i].name;
 				decl.type = expr.d.proc.in.data[i].type;
-				decl.place.kind = PLACE_FRAME;
 				type = &types.data[decl.type];
-				decl.place.size = type->size;
 				offset += type->size;
-				decl.place.l.off = -offset - 8;
 				array_add((&expr.d.proc.block.decls), decl);
 			}
 
@@ -187,7 +185,6 @@ parseexpr(struct block *block)
 				decl.declared = true;
 				type = &types.data[decl.type];
 				offset += type->size;
-				decl.place.l.off = -offset;
 				array_add((&expr.d.proc.block.decls), decl);
 			}
 			parseblock(&expr.d.proc.block);
@@ -396,6 +393,7 @@ parseblock(struct block *block)
 		item.start = tok;
 		if (tok->type == TOK_LET) {
 			struct decl decl = { 0 };
+			decl.toplevel = !(blocki - 1);
 			decl.start = tok;
 			item.kind = ITEM_DECL;
 			tok = tok->next;

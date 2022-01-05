@@ -116,28 +116,16 @@ struct assgns {
 	struct assgn *data;
 };
 
-struct place {
-	enum {
-		PLACE_ABS = 1,
-		PLACE_FRAME,
-		PLACE_STACK,
-		PLACE_REG,
-		PLACE_REGADDR,
-	} kind;
-	union {
-		size_t addr;
-		int64_t off;
-		int reg;
-	} l;
-	size_t size;
-};
-
 struct decl {
 	struct slice s;
 	size_t type;
 	size_t val; // struct exprs
 	bool declared;
-	struct place place;
+	bool toplevel;
+	union {
+		uint64_t index;
+		uint64_t addr;
+	} w;
 	struct token *start;
 };
 

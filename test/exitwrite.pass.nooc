@@ -1,6 +1,7 @@
 let s [6]i8 = "hello\n"
 
 let write proc(i64, $i8, i64) (i64) = proc(fd i64, data $i8, len i64) (out i64) {
+	let a i64 = 0
 	out = syscall(1, fd, data, len)
 	return
 }

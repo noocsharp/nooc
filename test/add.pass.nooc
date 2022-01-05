@@ -1,0 +1,5 @@
+let main proc() = proc() {
+	let a i64 = 10
+	a = + a 10
+	syscall(60, 0)
+}

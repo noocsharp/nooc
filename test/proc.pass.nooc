@@ -1,5 +1,7 @@
+let s [6]i8 = "hello\n"
+
 let hello proc() = proc() {
-	syscall(1, 1, "hello\n", 6)
+	syscall(1, 1, $s, 6)
 	return
 }
 
