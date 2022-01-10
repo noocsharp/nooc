@@ -191,6 +191,7 @@ genexpr(struct iproc *out, size_t expri)
 		break;
 	}
 	case EXPR_FCALL: {
+		what = 1; // value doesn't matter
 		uint64_t proc = procindex(out->top, &expr->d.call.name);
 		size_t params[20];
 		assert(expr->d.call.params.len < 20);
@@ -205,9 +206,6 @@ genexpr(struct iproc *out, size_t expri)
 			STARTINS(IR_ALLOC, 1); // don't hardcode size
 		}
 		params[expr->d.call.params.len] = out_index;
-		what = NEWTMP;
-		STARTINS(IR_ASSIGN, what);
-		PUTINS(IR_SIZE, 8);
 		PUTINS(IR_CALL, proc);
 		for (size_t i = expr->d.call.params.len; i <= expr->d.call.params.len; i--) {
 			PUTINS(IR_CALLARG, params[i]);

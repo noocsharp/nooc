@@ -59,7 +59,7 @@ size_t jng(char *buf, int64_t offset);
 size_t jg(char *buf, int64_t offset);
 size_t jne(char *buf, int64_t offset);
 size_t jmp(char *buf, int64_t offset);
-size_t call(char *buf, enum reg reg);
+size_t call(char *buf, int32_t offset);
 size_t ret(char *buf);
 size_t push_r64(char *buf, enum reg reg);
 size_t pop_r64(char *buf, enum reg reg);

@@ -74,6 +74,7 @@ emitblock(char *buf, struct iproc *proc, struct instr *start, struct instr *end,
 	end = end ? end : &proc->data[proc->len];
 
 	uint64_t dest, src, size, count, tmp, label;
+	int64_t offset;
 	uint64_t localalloc = 0;
 
 	size_t total = 0;
@@ -160,29 +161,32 @@ emitblock(char *buf, struct iproc *proc, struct instr *start, struct instr *end,
 				localalloc += 8;
 				NEXT;
 				break;
-			case IR_CALL:
-				count = 0;
-				total += mov_r64_imm(buf ? buf + total : NULL, dest, proc->top->code.data[ins->id].addr);
-				NEXT;
-
-				for (int i = 0; i < 16; i++) {
-					total += push_r64(buf ? buf + total : NULL, i);
-				}
-
-				while (ins->op == IR_CALLARG) {
-					count++;
-					total += push_r64(buf ? buf + total : NULL, proc->intervals.data[ins->id].reg);
-					NEXT;
-				}
-				total += call(buf ? buf + total : NULL, dest);
-				// FIXME: this won't work with non-64-bit things
-				total += add_r64_imm(buf ? buf + total : NULL, RSP, 8*count);
-				for (int i = 15; i >= 0; i--) {
-					total += pop_r64(buf ? buf + total : NULL, i);
-				}
-				break;
 			default:
 				die("x64 emitblock: unhandled assign instruction");
+			}
+			break;
+		case IR_CALL:
+			count = 0;
+			dest = ins->id;
+
+			for (int i = 0; i < 16; i++) {
+				total += push_r64(buf ? buf + total : NULL, i);
+			}
+
+			NEXT;
+			while (ins->op == IR_CALLARG) {
+				count++;
+				total += push_r64(buf ? buf + total : NULL, proc->intervals.data[ins->id].reg);
+				NEXT;
+			}
+
+			// we assume call is constant width - this should probably change
+			offset = -(proc->addr + total - proc->top->code.data[dest].addr + call(NULL, 0));
+			total += call(buf ? buf + total : NULL, offset);
+			// FIXME: this won't work with non-64-bit things
+			total += add_r64_imm(buf ? buf + total : NULL, RSP, 8*count);
+			for (int i = 15; i >= 0; i--) {
+				total += pop_r64(buf ? buf + total : NULL, i);
 			}
 			break;
 		case IR_LABEL:
@@ -781,17 +785,17 @@ jmp(char *buf, int64_t offset)
 }
 
 size_t
-call(char *buf, enum reg reg)
+call(char *buf, int32_t offset)
 {
 	if (buf) {
-		if (reg >= 8)
-			*(buf++) = REX_B;
-
-		*(buf++) = 0xFF;
-		*(buf++) = (MOD_DIRECT << 6) | (2 << 3) | (reg & 7);
+		*(buf++) = 0xE8;
+		*(buf++) = (uint32_t) offset & 0xff;
+		*(buf++) = ((uint32_t) offset >> 8) & 0xff;
+		*(buf++) = ((uint32_t) offset >> 16) & 0xff;
+		*(buf++) = ((uint32_t) offset >> 24) & 0xff;
 	}
 
-	return reg >= 8 ? 3 : 2;
+	return 5;
 }
 
 size_t
