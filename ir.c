@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <strings.h>
 
 #include "array.h"
 #include "nooc.h"
@@ -33,17 +34,15 @@ uint64_t out_index;
 static uint8_t
 regalloc()
 {
-	// FIXME: can probably use ffs or something
-	for (uint8_t i = 0; i < 16; i++) {
-		if (regs & (1 << i))
-			continue;
+	int free = ffs(~regs);
+	if (!free)
+		die("out of registers!");
 
-		regs |= (1 << i);
-		return i;
-	}
+	// the nth register being free corresponds to shifting by n-1
+	free--;
+	regs |= (1 << free);
 
-	die("out of registers!");
-	return 0;
+	return free;
 }
 
 static void
