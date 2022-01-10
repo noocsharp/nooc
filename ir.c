@@ -14,6 +14,7 @@
 extern struct types types;
 extern struct exprs exprs;
 extern struct assgns assgns;
+extern struct toplevel toplevel;
 
 #define PUTINS(op, val) ins = (struct instr){(op), (val)} ; bumpinterval(out, &ins, val) ; array_add(out, ins) ;
 #define STARTINS(op, val) curi++ ; PUTINS((op), (val)) ;
@@ -56,10 +57,10 @@ static void
 genblock(struct iproc *out, struct block *block);
 
 static uint64_t
-procindex(struct toplevel *top, struct slice *s)
+procindex(struct slice *s)
 {
-	for (size_t i = 0; i < top->code.len; i++) {
-		struct iproc *iproc = &top->code.data[i];
+	for (size_t i = 0; i < toplevel.code.len; i++) {
+		struct iproc *iproc = &toplevel.code.data[i];
 		if (slice_cmp(s, &iproc->s) == 0)
 			return i;
 	}
@@ -192,7 +193,7 @@ genexpr(struct iproc *out, size_t expri)
 	}
 	case EXPR_FCALL: {
 		what = 1; // value doesn't matter
-		uint64_t proc = procindex(out->top, &expr->d.call.name);
+		uint64_t proc = procindex(&expr->d.call.name);
 		size_t params[20];
 		assert(expr->d.call.params.len < 20);
 		for (size_t i = 0; i < expr->d.call.params.len; i++) {

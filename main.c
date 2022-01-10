@@ -34,6 +34,8 @@ extern struct types types;
 extern const struct target x64_target;
 struct target targ;
 
+struct toplevel toplevel;
+
 char *infile;
 
 // TODO: remove
@@ -141,7 +143,6 @@ gentoplevel(struct toplevel *toplevel, struct block *block)
 				blockpush(&expr->d.proc.block);
 				typecheck(&expr->d.proc.block);
 				iproc = (struct iproc){ 0 };
-				iproc.top = toplevel;
 				iproc.s = decl->s;
 				iproc.addr = curaddr;
 				genproc(&iproc, &(expr->d.proc));
@@ -204,7 +205,6 @@ main(int argc, char *argv[])
 	inittypes();
 	struct block items = parse(head);
 
-	struct toplevel toplevel = { 0 };
 	gentoplevel(&toplevel, &items);
 
 	FILE *out = fopen(argv[2], "w");

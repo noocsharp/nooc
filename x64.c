@@ -27,6 +27,8 @@ enum mod {
 char abi_arg[] = {RAX, RDI, RSI, RDX, R10, R8, R9};
 unsigned short used_reg;
 
+extern struct toplevel toplevel;
+
 #define NEXT ins++; assert(ins <= end);
 
 static size_t
@@ -181,7 +183,7 @@ emitblock(char *buf, struct iproc *proc, struct instr *start, struct instr *end,
 			}
 
 			// we assume call is constant width - this should probably change
-			offset = -(proc->addr + total - proc->top->code.data[dest].addr + call(NULL, 0));
+			offset = -(proc->addr + total - toplevel.code.data[dest].addr + call(NULL, 0));
 			total += call(buf ? buf + total : NULL, offset);
 			// FIXME: this won't work with non-64-bit things
 			total += add_r64_imm(buf ? buf + total : NULL, RSP, 8*count);

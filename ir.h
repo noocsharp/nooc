@@ -41,7 +41,6 @@ struct iproc {
 	size_t cap;
 	uint64_t addr;
 	struct instr *data;
-	struct toplevel *top; // FIXME: basically just used to pass a parameter...
 	struct slice s;
 	struct {
 		size_t len;
