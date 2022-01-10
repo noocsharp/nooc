@@ -202,11 +202,11 @@ genexpr(struct iproc *out, size_t expri)
 			// allocate memory even if we don't need to store the return value
 			out_index = NEWTMP;
 			STARTINS(IR_ASSIGN, out_index);
-			STARTINS(IR_SIZE, 8); // don't hardcode size
-			STARTINS(IR_ALLOC, 1); // don't hardcode size
+			PUTINS(IR_SIZE, 8); // don't hardcode size
+			PUTINS(IR_ALLOC, 1); // don't hardcode size
 		}
 		params[expr->d.call.params.len] = out_index;
-		PUTINS(IR_CALL, proc);
+		STARTINS(IR_CALL, proc);
 		for (size_t i = expr->d.call.params.len; i <= expr->d.call.params.len; i--) {
 			PUTINS(IR_CALLARG, params[i]);
 		}
@@ -337,7 +337,7 @@ genproc(struct iproc *out, struct proc *proc)
 		decl->index = what;
 		STARTINS(IR_ASSIGN, what);
 		PUTINS(IR_SIZE, type->size);
-		STARTINS(IR_IN, i);
+		PUTINS(IR_IN, i);
 	}
 
 	for (size_t j = 0; j < proc->out.len; j++, i++) {
@@ -347,7 +347,7 @@ genproc(struct iproc *out, struct proc *proc)
 		decl->index = what;
 		STARTINS(IR_ASSIGN, what);
 		PUTINS(IR_SIZE, 8);
-		STARTINS(IR_IN, i);
+		PUTINS(IR_IN, i);
 	}
 
 	genblock(out, &proc->block);
