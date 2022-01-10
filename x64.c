@@ -617,18 +617,28 @@ ret(char *buf)
 	return 1;
 }
 
-size_t push_r64(char *buf, enum reg reg)
+size_t
+push_r64(char *buf, enum reg reg)
 {
-	if (buf)
-		*buf = 0x50 + reg;
+	if (buf) {
+		if (reg >= 8)
+			*(buf++) = REX_B;
 
-	return 1;
+		*buf = 0x50 + (reg & 7);
+	}
+
+	return reg >= 8 ? 2 : 1;
 }
 
-size_t pop_r64(char *buf, enum reg reg)
+size_t
+pop_r64(char *buf, enum reg reg)
 {
-	if (buf)
-		*buf = 0x58 + reg;
+	if (buf) {
+		if (reg >= 8)
+			*(buf++) = REX_B;
 
-	return 1;
+		*buf = 0x58 + (reg & 7);
+	}
+
+	return reg >= 8 ? 2 : 1;
 }
