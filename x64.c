@@ -598,11 +598,14 @@ size_t
 call(char *buf, enum reg reg)
 {
 	if (buf) {
+		if (reg >= 8)
+			*(buf++) = REX_B;
+
 		*(buf++) = 0xFF;
-		*(buf++) = (MOD_DIRECT << 6) | (2 << 3) | reg;
+		*(buf++) = (MOD_DIRECT << 6) | (2 << 3) | (reg & 7);
 	}
 
-	return 2;
+	return reg >= 8 ? 3 : 2;
 }
 
 size_t
