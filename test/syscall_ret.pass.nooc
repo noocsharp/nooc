@@ -1,10 +1,10 @@
 let s [12]i8 = "syscall_ret\n"
 
 let main proc() = proc() {
-	let ret i64 = syscall(1, 1, $s, 11)
+	let ret i64 = syscall4(1, 1, $s, 11)
 	if = ret 11 {
-		syscall(60, 0)
+		syscall2(60, 0)
 	} else {
-		syscall(60, 1)
+		syscall2(60, 1)
 	}
 }

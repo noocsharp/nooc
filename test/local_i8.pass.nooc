@@ -1,8 +1,8 @@
 let main proc() = proc() {
 	let a i8 = 1
 	if = a 1 {
-		syscall(60, 0)
+		syscall2(60, 0)
 	} else {
-		syscall(60, 1)
+		syscall2(60, 1)
 	}
 }

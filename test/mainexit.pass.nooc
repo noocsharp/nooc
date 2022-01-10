@@ -1,4 +1,4 @@
 let main proc() = proc() {
-	syscall(60, 0)
+	syscall2(60, 0)
 }
 

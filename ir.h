@@ -29,12 +29,25 @@ struct instr {
 	uint64_t id;
 };
 
+struct interval {
+	uint64_t start;
+	uint64_t end;
+	bool active;
+	uint8_t reg;
+};
+
 struct iproc {
 	size_t len;
 	size_t cap;
+	uint64_t addr;
 	struct instr *data;
 	struct toplevel *top; // FIXME: basically just used to pass a parameter...
 	struct slice s;
+	struct {
+		size_t len;
+		size_t cap;
+		struct interval *data;
+	} intervals;
 };
 
 struct iprocs {
@@ -44,7 +57,9 @@ struct iprocs {
 
 struct toplevel {
 	struct data data;
+	struct data text;
 	struct iprocs code;
+	uint64_t entry;
 };
 
 void genproc(struct iproc *out, struct proc *proc);

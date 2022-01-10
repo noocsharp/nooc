@@ -120,10 +120,13 @@ struct decl {
 	struct slice s;
 	size_t type;
 	size_t val; // struct exprs
-	bool declared;
+	bool in;
+	bool out;
 	bool toplevel;
+	uint64_t index;
+
 	union {
-		uint64_t index;
+		int64_t offset;
 		uint64_t addr;
 	} w;
 	struct token *start;
@@ -244,4 +247,9 @@ struct exprs {
 	size_t cap;
 	size_t len;
 	struct expr *data;
+};
+
+struct target {
+	uint32_t reserved;
+	size_t (*emitsyscall)(char *buf, uint8_t paramcount);
 };

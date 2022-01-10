@@ -10,10 +10,10 @@
 #include <unistd.h>
 
 #include "array.h"
-#include "x64.h"
 #include "nooc.h"
 #include "ir.h"
 #include "util.h"
+#include "x64.h"
 #include "elf.h"
 #include "lex.h"
 #include "parse.h"
@@ -30,6 +30,9 @@ struct map *typesmap;
 struct assgns assgns;
 struct exprs exprs;
 extern struct types types;
+
+extern const struct target x64_target;
+struct target targ;
 
 char *infile;
 
@@ -92,16 +95,29 @@ evalexpr(struct decl *decl)
 	}
 }
 
-size_t
+void
 gentoplevel(struct toplevel *toplevel, struct block *block)
 {
+	char syscallname[] = "syscall0";
 	blockpush(block);
 	typecheck(block);
-	size_t total = 0;
+	size_t len = 0;
 	struct iproc iproc = { 0 };
+	uint64_t curaddr = TEXT_OFFSET;
 
-	iproc.s = (struct slice){7, 7, "syscall"};
-	array_add((&toplevel->code), iproc);
+	iproc.s = (struct slice){8, 8, syscallname};
+	for (int i = 1; i < 8; i++) {
+		syscallname[7]++;
+		iproc.s.data = strdup(syscallname);
+		iproc.addr = curaddr;
+		len = targ.emitsyscall(NULL, i);
+		void *buf = xcalloc(1, len); // FIXME: unnecessary
+		len = targ.emitsyscall(buf, i);
+		array_push((&toplevel->text), buf, len);
+		free(buf);
+		array_add((&toplevel->code), iproc);
+		curaddr += len;
+	}
 	for (int i = 0; i < block->len; i++) {
 		struct item *item = &block->data[i];
 
@@ -116,17 +132,31 @@ gentoplevel(struct toplevel *toplevel, struct block *block)
 
 			decl_alloc(block, decl);
 
+			// FIXME: clean this whole thing up
 			if (expr->class == C_PROC) {
+				if (slice_cmplit(&decl->s, "main") == 0) {
+					toplevel->entry = curaddr;
+				}
 				assert(expr->kind = EXPR_PROC);
+				blockpush(&expr->d.proc.block);
+				typecheck(&expr->d.proc.block);
 				iproc = (struct iproc){ 0 };
 				iproc.top = toplevel;
 				iproc.s = decl->s;
+				iproc.addr = curaddr;
 				genproc(&iproc, &(expr->d.proc));
 				array_add((&toplevel->code), iproc);
+				len = emitproc(NULL, &iproc);
+				void *buf = xcalloc(1, len); // FIXME: unnecessary
+				len = emitproc(buf, &iproc);
+				curaddr += len;
+				array_push((&toplevel->text), buf, len);
+				free(buf);
+
+				blockpop();
 			} else {
 				evalexpr(decl);
 			}
-			decl->declared = true;
 			break;
 		}
 		default:
@@ -135,8 +165,6 @@ gentoplevel(struct toplevel *toplevel, struct block *block)
 
 	}
 	blockpop();
-
-	return total;
 }
 
 struct stat statbuf;
@@ -144,6 +172,7 @@ struct stat statbuf;
 int
 main(int argc, char *argv[])
 {
+	targ = x64_target;
 	if (argc < 3) {
 		fprintf(stderr, "not enough args\n");
 		return 1;
@@ -185,14 +214,9 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	blockpush(&items);
-	struct decl *main = finddecl((struct slice){4, 4, "main"});
-	if (main == NULL) {
-		fprintf(stderr, "main function not found\n");
-		return 1;
-	}
-	blockpop();
 	munmap(addr, statbuf.st_size);
+
+	elf(toplevel.entry, toplevel.text.data, toplevel.text.len, data_seg.data, data_seg.len, out);
 
 	fclose(out);
 }

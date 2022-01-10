@@ -139,10 +139,10 @@ dumpir(struct iproc *instrs)
 
 		switch (instr->op) {
 		case IR_IN:
-			fprintf(stderr, "in %%%lu\n", instr->id);
+			fprintf(stderr, "in %lu\n", instr->id);
 			break;
 		case IR_SIZE:
-			fprintf(stderr, "size %lu\n", instr->id);
+			fprintf(stderr, "s%lu ", instr->id);
 			break;
 		case IR_IMM:
 			fprintf(stderr, "imm %lu\n", instr->id);
@@ -196,6 +196,10 @@ dumpir(struct iproc *instrs)
 	if (callarg) putc('\n', stderr);
 
 	putc('\n', stderr);
+
+	for (size_t i = 0; i < instrs->intervals.len; i++) {
+		fprintf(stderr, "%lu: %lu to %lu\n", i, instrs->intervals.data[i].start, instrs->intervals.data[i].end);
+	}
 }
 
 int

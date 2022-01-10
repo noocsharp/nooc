@@ -1,5 +1,5 @@
 let exit proc(i64) = proc(code i64) {
-	syscall(60, code)
+	syscall2(60, code)
 }
 
 let main proc() = proc() {

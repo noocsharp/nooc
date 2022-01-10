@@ -4,8 +4,8 @@
 #include <string.h>
 
 #include "nooc.h"
-#include "x64.h"
 #include "ir.h"
+#include "x64.h"
 #include "util.h"
 
 enum rex {
@@ -26,6 +26,192 @@ enum mod {
 
 char abi_arg[] = {RAX, RDI, RSI, RDX, R10, R8, R9};
 unsigned short used_reg;
+
+#define NEXT ins++; assert(ins <= end);
+
+static size_t
+emitsyscall(char *buf, uint8_t paramcount)
+{
+	assert(paramcount < 8);
+	size_t total = 0;
+	total += push_r64(buf ? buf + total : NULL, RBP);
+	total += mov_r64_r64(buf ? buf + total : NULL, RBP, RSP);
+
+	for (size_t i = 0; i < paramcount; i++) {
+		total += push_r64(buf ? buf + total : NULL, abi_arg[i]);
+		total += mov_disp8_r64_m64(buf ? buf + total : NULL, abi_arg[i], RBP, 8*i + 16);
+	}
+
+	if (buf) {
+		*(buf + total++) = 0x0f;
+		*(buf + total++) = 0x05;
+	} else {
+		total += 2;
+	}
+
+	total += mov_disp8_r64_m64(buf ? buf + total : NULL, RDI, RBP, 8*paramcount + 16);
+	total += mov_mr64_r64(buf ? buf + total : NULL, RDI, RAX);
+
+	for (size_t i = paramcount - 1; i < paramcount; i--) {
+		total += pop_r64(buf ? buf + total : NULL, abi_arg[i]);
+	}
+
+	total += pop_r64(buf ? buf + total : NULL, RBP);
+	total += ret(buf ? buf + total : NULL);
+
+	return total;
+}
+
+const struct target x64_target = {
+	.reserved = (1 << RSP) | (1 << RBP),
+	.emitsyscall = emitsyscall
+};
+
+size_t
+emitblock(char *buf, struct iproc *proc, struct instr *start, struct instr *end, uint64_t end_label)
+{
+	struct instr *ins = start ? start : proc->data;
+	end = end ? end : &proc->data[proc->len];
+
+	uint64_t dest, src, size, count, tmp, label;
+	uint64_t localalloc = 0;
+
+	size_t total = 0;
+	if (!start) {
+		total += push_r64(buf ? buf + total : NULL, RBP);
+		total += mov_r64_r64(buf ? buf + total : NULL, RBP, RSP);
+	}
+
+	while (ins < end) {
+		switch (ins->op) {
+		// FIXME: we don't handle jumps backward yet
+		case IR_JUMP:
+			total += jmp(buf ? buf + total : NULL, emitblock(NULL, proc, ins + 1, end, ins->id));
+			NEXT;
+			break;
+		case IR_RETURN:
+			total += add_r64_imm(buf ? buf + total : NULL, RSP, localalloc);
+			total += pop_r64(buf ? buf + total : NULL, RBP);
+			total += ret(buf ? buf + total : NULL);
+			NEXT;
+			break;
+		case IR_SIZE:
+			size = ins->id;
+			NEXT;
+
+			switch (ins->op) {
+			case IR_STORE:
+				src = proc->intervals.data[ins->id].reg;
+				NEXT;
+				assert(ins->op == IR_EXTRA);
+				total += mov_mr64_r64(buf ? buf + total : NULL, proc->intervals.data[ins->id].reg, src);
+				NEXT;
+				break;
+			default:
+				die("x64 emitblock: unhandled size instruction");
+			}
+			break;
+		case IR_ASSIGN:
+			tmp = ins->id;
+			dest = proc->intervals.data[ins->id].reg;
+			NEXT;
+
+			assert(ins->op == IR_SIZE);
+			size = ins->id;
+			NEXT;
+
+			switch (ins->op) {
+			case IR_CEQ:
+				total += mov_r64_r64(buf ? buf + total : NULL, dest, proc->intervals.data[ins->id].reg);
+				NEXT;
+				total += cmp_r64_r64(buf ? buf + total : NULL, dest, proc->intervals.data[ins->id].reg);
+				NEXT;
+				if (ins->op == IR_CONDJUMP) {
+					label = ins->id;
+					NEXT;
+					assert(ins->op == IR_EXTRA);
+					if (ins->id == tmp) {
+						total += jne(buf ? buf + total : NULL, emitblock(NULL, proc, ins + 1, end, label));
+					}
+					NEXT;
+				}
+				break;
+			case IR_ADD:
+				total += mov_r64_r64(buf ? buf + total : NULL, dest, proc->intervals.data[ins->id].reg);
+				NEXT;
+				total += add_r64_r64(buf ? buf + total : NULL, dest, proc->intervals.data[ins->id].reg);
+				NEXT;
+				break;
+			case IR_IMM:
+				total += mov_r64_imm(buf ? buf + total : NULL, dest, ins->id);
+				NEXT;
+				break;
+			case IR_IN:
+				total += mov_disp8_r64_m64(buf ? buf + total : NULL, dest, RBP, 8*ins->id + 16);
+				NEXT;
+				break;
+			case IR_LOAD:
+				total += mov_r64_mr64(buf ? buf + total : NULL, dest, proc->intervals.data[ins->id].reg);
+				NEXT;
+				break;
+			case IR_ALLOC:
+				total += mov_r64_r64(buf ? buf + total : NULL, dest, RSP);
+				total += sub_r64_imm(buf ? buf + total : NULL, RSP, 8); // FIXME: hardcoding
+				localalloc += 8;
+				NEXT;
+				break;
+			case IR_CALL:
+				count = 0;
+				total += mov_r64_imm(buf ? buf + total : NULL, dest, proc->top->code.data[ins->id].addr);
+				NEXT;
+
+				for (int i = 0; i < 16; i++) {
+					total += push_r64(buf ? buf + total : NULL, i);
+				}
+
+				while (ins->op == IR_CALLARG) {
+					count++;
+					total += push_r64(buf ? buf + total : NULL, proc->intervals.data[ins->id].reg);
+					NEXT;
+				}
+				total += call(buf ? buf + total : NULL, dest);
+				// FIXME: this won't work with non-64-bit things
+				total += add_r64_imm(buf ? buf + total : NULL, RSP, 8*count);
+				for (int i = 15; i >= 0; i--) {
+					total += pop_r64(buf ? buf + total : NULL, i);
+				}
+				break;
+			default:
+				die("x64 emitblock: unhandled assign instruction");
+			}
+			break;
+		case IR_LABEL:
+			if (ins->id == end_label)
+				goto done;
+
+			NEXT;
+			break;
+		case IR_STORE:
+		case IR_IMM:
+		case IR_ALLOC:
+			die("x64 emitblock: invalid start of instruction");
+		default:
+			die("x64 emitproc: unknown instruction");
+		}
+	}
+
+done:
+	return total;
+}
+
+// FIXME: use array_push
+size_t
+emitproc(char *buf, struct iproc *proc)
+{
+	return emitblock(buf, proc, NULL, NULL, 0);
+}
+
+#undef NEXT
 
 void
 clearreg()

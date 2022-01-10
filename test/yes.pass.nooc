@@ -4,6 +4,6 @@ let main proc() = proc() {
 	let write i64 = 1
 	let stdout i64 = 1
 	let count i64 = 0
-	syscall(write, stdout, $y, 2)
-	syscall(60, 0)
+	syscall4(write, stdout, $y, 2)
+	syscall2(60, 0)
 }

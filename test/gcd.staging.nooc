@@ -1,0 +1,10 @@
+let gcd proc(i64, i64) (i64) = proc(a i64, b i64) (out i64) {
+	let c i64 = 0
+	loop != b 0 {
+		out = b
+		b = a % b
+		a = out
+	}
+
+	return
+}

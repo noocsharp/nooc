@@ -1,6 +1,6 @@
 let arr [5]i8 = "sup!\n"
 
 let main proc() = proc() {
-	syscall(1, 1, $arr, 5)
-	syscall(60, 0)
+	syscall4(1, 1, $arr, 5)
+	syscall2(60, 0)
 }

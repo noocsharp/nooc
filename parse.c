@@ -174,6 +174,7 @@ parseexpr(struct block *block)
 			for (int i = expr.d.proc.in.len - 1; i >= 0; i--) {
 				decl.s = expr.d.proc.in.data[i].name;
 				decl.type = expr.d.proc.in.data[i].type;
+				decl.in = true;
 				type = &types.data[decl.type];
 				offset += type->size;
 				array_add((&expr.d.proc.block.decls), decl);
@@ -181,8 +182,8 @@ parseexpr(struct block *block)
 
 			for (size_t i = 0; i < expr.d.proc.out.len; i++) {
 				decl.s = expr.d.proc.out.data[i].name;
-				decl.type = expr.d.proc.out.data[i].type;
-				decl.declared = true;
+				decl.type = typeref(expr.d.proc.out.data[i].type);
+				decl.in = decl.out = true;
 				type = &types.data[decl.type];
 				offset += type->size;
 				array_add((&expr.d.proc.block.decls), decl);

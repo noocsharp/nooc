@@ -2,5 +2,5 @@ let main proc() = proc() {
 	let a i64 = 100
 	let b i32 = 0
 
-	syscall(60, b)
+	syscall2(60, b)
 }

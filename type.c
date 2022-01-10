@@ -202,6 +202,18 @@ typecompat(size_t typei, size_t expri)
 	}
 }
 
+size_t
+typeref(size_t typei)
+{
+	struct type ref = {
+		.class = TYPE_REF,
+		.size = 8,
+		.d.subtype = typei
+	};
+
+	return type_put(&ref);
+}
+
 static void
 typecheckcall(struct expr *expr)
 {
@@ -269,7 +281,12 @@ typecheck(struct block *block)
 				error(assgn->start->line, assgn->start->col, "typecheck: unknown name '%.*s'", assgn->s.len, assgn->s.data);
 
 			typecheckexpr(assgn->val);
-			typecompat(decl->type, assgn->val);
+			if (decl->out) {
+				struct type *type = &types.data[decl->type];
+				typecompat(type->d.subtype, assgn->val);
+			} else {
+				typecompat(decl->type, assgn->val);
+			}
 			break;
 		case ITEM_DECL:
 			decl = &block->decls.data[item->idx];

@@ -2,8 +2,8 @@ let a i32 = 65540
 
 let main proc() = proc() {
 	if = a 65540 {
-		syscall(60, 0)
+		syscall2(60, 0)
 	} else {
-		syscall(60, 1)
+		syscall2(60, 1)
 	}
 }
