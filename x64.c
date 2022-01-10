@@ -238,7 +238,7 @@ mov_mr64_r64(char *buf, enum reg dest, enum reg src)
 {
 	if (buf) {
 		*(buf++) = REX_W;
-		*(buf++) = 0x8B;
+		*(buf++) = 0x89;
 		*(buf++) = (MOD_INDIRECT << 6) | (src << 3) | dest;
 	}
 
@@ -249,7 +249,7 @@ size_t
 mov_mr32_r32(char *buf, enum reg dest, enum reg src)
 {
 	if (buf) {
-		*(buf++) = 0x8B;
+		*(buf++) = 0x89;
 		*(buf++) = (MOD_INDIRECT << 6) | (src << 3) | dest;
 	}
 
@@ -261,7 +261,7 @@ mov_mr16_r16(char *buf, enum reg dest, enum reg src)
 {
 	if (buf) {
 		*(buf++) = OP_SIZE_OVERRIDE;
-		*(buf++) = 0x8B;
+		*(buf++) = 0x89;
 		*(buf++) = (MOD_INDIRECT << 6) | (src << 3) | dest;
 	}
 
@@ -272,7 +272,7 @@ size_t
 mov_mr8_r8(char *buf, enum reg dest, enum reg src)
 {
 	if (buf) {
-		*(buf++) = 0x8A;
+		*(buf++) = 0x88;
 		*(buf++) = (MOD_INDIRECT << 6) | (src << 3) | dest;
 	}
 
@@ -284,7 +284,7 @@ mov_r64_mr64(char *buf, enum reg dest, enum reg src)
 {
 	if (buf) {
 		*(buf++) = REX_W;
-		*(buf++) = 0x89;
+		*(buf++) = 0x8B;
 		*(buf++) = (MOD_INDIRECT << 6) | (dest << 3) | src;
 	}
 
@@ -295,7 +295,7 @@ size_t
 mov_r32_mr32(char *buf, enum reg dest, enum reg src)
 {
 	if (buf) {
-		*(buf++) = 0x89;
+		*(buf++) = 0x8B;
 		*(buf++) = (MOD_INDIRECT << 6) | (dest << 3) | src;
 	}
 
@@ -307,7 +307,7 @@ mov_r16_mr16(char *buf, enum reg dest, enum reg src)
 {
 	if (buf) {
 		*(buf++) = OP_SIZE_OVERRIDE;
-		*(buf++) = 0x89;
+		*(buf++) = 0x8B;
 		*(buf++) = (MOD_INDIRECT << 6) | (dest << 3) | src;
 	}
 
@@ -318,7 +318,7 @@ size_t
 mov_r8_mr8(char *buf, enum reg dest, enum reg src)
 {
 	if (buf) {
-		*(buf++) = 0x88;
+		*(buf++) = 0x8A;
 		*(buf++) = (MOD_INDIRECT << 6) | (dest << 3) | src;
 	}
 
