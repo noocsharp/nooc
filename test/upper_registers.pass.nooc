@@ -1,0 +1,17 @@
+let foo proc(i64, i64, i64, i64, i64, i64, i64, i64) (i64) = proc(a i64, b i64, c i64, d i64, e i64, f i64, g i64, h i64) (out i64) {
+	out = + + + + + + + a b c d e f g h
+	return
+}
+
+let main proc() = proc() {
+	let a i64 = 1
+	let b i64 = 2
+	let c i64 = 3
+	let d i64 = 4
+	let e i64 = 5
+	let f i64 = 6
+	let g i64 = 7
+	let h i64 = 8
+	foo(a, b, c, d, e, f, g, h)
+	syscall2(60, 0)
+}

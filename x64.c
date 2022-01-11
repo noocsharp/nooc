@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <strings.h>
 
 #include "nooc.h"
 #include "ir.h"
@@ -209,231 +210,179 @@ mov_m32_r32(char *buf, uint64_t addr, enum reg src)
 	return 9;
 }
 
+#define MOVE_FROMREG 0
+#define MOVE_TOREG 1
+
+static size_t
+_move_between_reg_and_memaddr_in_reg(char *buf, enum reg reg, enum reg mem, uint8_t opsize, bool dir)
+{
+	uint8_t rex = opsize == 8 ? REX_W : 0;
+	rex |= (reg >= 8 ? REX_R : 0) | (mem >= 8 ? REX_B : 0);
+
+	if (buf) {
+		if (opsize == 2)
+			*(buf++) = OP_SIZE_OVERRIDE;
+
+		if (rex)
+			*(buf++) = rex;
+
+		*(buf++) = 0x88 + (opsize != 1) + 2*dir;
+
+		*(buf++) = (MOD_INDIRECT << 6) | ((reg & 7) << 3) | (mem & 7);
+	}
+
+	// 8 and 2 have a length of 3, but 4 and 1 have a length of 2
+	return !!rex + (opsize == 2) + 2;
+}
+
 static size_t
 mov_mr64_r64(char *buf, enum reg dest, enum reg src)
 {
-	if (buf) {
-		*(buf++) = REX_W;
-		*(buf++) = 0x89;
-		*(buf++) = (MOD_INDIRECT << 6) | (src << 3) | dest;
-	}
-
-	return 3;
+	return _move_between_reg_and_memaddr_in_reg(buf, src, dest, 8, MOVE_FROMREG);
 }
 
 static size_t
 mov_mr32_r32(char *buf, enum reg dest, enum reg src)
 {
-	if (buf) {
-		*(buf++) = 0x89;
-		*(buf++) = (MOD_INDIRECT << 6) | (src << 3) | dest;
-	}
-
-	return 2;
+	return _move_between_reg_and_memaddr_in_reg(buf, src, dest, 4, MOVE_FROMREG);
 }
 
 static size_t
 mov_mr16_r16(char *buf, enum reg dest, enum reg src)
 {
-	if (buf) {
-		*(buf++) = OP_SIZE_OVERRIDE;
-		*(buf++) = 0x89;
-		*(buf++) = (MOD_INDIRECT << 6) | (src << 3) | dest;
-	}
-
-	return 3;
+	return _move_between_reg_and_memaddr_in_reg(buf, src, dest, 2, MOVE_FROMREG);
 }
 
 static size_t
 mov_mr8_r8(char *buf, enum reg dest, enum reg src)
 {
-	if (buf) {
-		*(buf++) = 0x88;
-		*(buf++) = (MOD_INDIRECT << 6) | (src << 3) | dest;
-	}
-
-	return 2;
+	return _move_between_reg_and_memaddr_in_reg(buf, src, dest, 1, MOVE_FROMREG);
 }
 
 static size_t
 mov_r64_mr64(char *buf, enum reg dest, enum reg src)
 {
-	if (buf) {
-		*(buf++) = REX_W;
-		*(buf++) = 0x8B;
-		*(buf++) = (MOD_INDIRECT << 6) | (dest << 3) | src;
-	}
-
-	return 3;
+	return _move_between_reg_and_memaddr_in_reg(buf, dest, src, 8, MOVE_TOREG);
 }
 
 static size_t
 mov_r32_mr32(char *buf, enum reg dest, enum reg src)
 {
-	if (buf) {
-		*(buf++) = 0x8B;
-		*(buf++) = (MOD_INDIRECT << 6) | (dest << 3) | src;
-	}
-
-	return 2;
+	return _move_between_reg_and_memaddr_in_reg(buf, dest, src, 4, MOVE_TOREG);
 }
 
 static size_t
 mov_r16_mr16(char *buf, enum reg dest, enum reg src)
 {
-	if (buf) {
-		*(buf++) = OP_SIZE_OVERRIDE;
-		*(buf++) = 0x8B;
-		*(buf++) = (MOD_INDIRECT << 6) | (dest << 3) | src;
-	}
-
-	return 3;
+	return _move_between_reg_and_memaddr_in_reg(buf, dest, src, 2, MOVE_TOREG);
 }
 
 static size_t
 mov_r8_mr8(char *buf, enum reg dest, enum reg src)
 {
+	return _move_between_reg_and_memaddr_in_reg(buf, dest, src, 1, MOVE_TOREG);
+}
+
+static size_t
+_move_between_reg_and_reg(char *buf, enum reg dest, enum reg src, uint8_t opsize)
+{
+	uint8_t rex = (src >= 8 ? REX_R : 0) | (dest >= 8 ? REX_B : 0) | (opsize == 8 ? REX_W : 0);
 	if (buf) {
-		*(buf++) = 0x8A;
-		*(buf++) = (MOD_INDIRECT << 6) | (dest << 3) | src;
+		if (opsize == 2)
+			*(buf++) = OP_SIZE_OVERRIDE;
+
+		if (rex)
+			*(buf++) = rex;
+
+		*(buf++) = 0x88 + (opsize != 1);
+		*(buf++) = (MOD_DIRECT << 6) | ((src & 7) << 3) | (dest & 7);
 	}
 
-	return 2;
+	return 2 + !!rex + (opsize == 2);
 }
 
 static size_t
 mov_r64_r64(char *buf, enum reg dest, enum reg src)
 {
-	if (buf) {
-		*(buf++) = REX_W | (src >= 8 ? REX_R : 0) | (dest >= 8 ? REX_B : 0);
-		*(buf++) = 0x89;
-		*(buf++) = (MOD_DIRECT << 6) | (src << 3) | dest;
-	}
-
-	return 3;
+	return _move_between_reg_and_reg(buf, dest, src, 8);
 }
 
 static size_t
 mov_r32_r32(char *buf, enum reg dest, enum reg src)
 {
+	return _move_between_reg_and_reg(buf, dest, src, 4);
+}
+
+static size_t
+_move_between_reg_and_memaddr_in_reg_with_disp(char *buf, enum reg reg, enum reg mem, int8_t disp, uint8_t opsize, bool dir)
+{
+	assert((reg & 7) != 4 && (mem & 7) != 4);
+	uint8_t rex = opsize == 8 ? REX_W : 0;
+	rex |= (reg >= 8 ? REX_R : 0) | (mem >= 8 ? REX_B : 0);
+
 	if (buf) {
-		if (src >= 8 || dest >= 8) *(buf++) = (src >= 8 ? REX_R : 0) | (dest >= 8 ? REX_B : 0);
-		*(buf++) = 0x89;
-		*(buf++) = (MOD_DIRECT << 6) | (src << 3) | dest;
+		if (opsize == 2)
+			*(buf++) = OP_SIZE_OVERRIDE;
+
+		if (rex)
+			*(buf++) = rex;
+
+		*(buf++) = 0x88 + (opsize != 1) + 2*dir;
+
+		*(buf++) = (MOD_DISP8 << 6) | ((reg & 7) << 3) | (mem & 7);
+		*(buf++) = disp;
 	}
 
-	return (src >= 8 || dest >= 8) ? 3 : 2;
+	// 8 and 2 have a length of 3, but 4 and 1 have a length of 2
+	return !!rex + (opsize == 2) + 3;
 }
 
 static size_t
 mov_disp8_m64_r64(char *buf, enum reg dest, int8_t disp, enum reg src)
 {
-	assert(src != 4);
-	if (buf) {
-		*(buf++) = REX_W;
-		*(buf++) = 0x89;
-		*(buf++) = (MOD_DISP8 << 6) | (src << 3) | dest;
-		*(buf++) = disp;
-	}
-
-	return 4;
+	return _move_between_reg_and_memaddr_in_reg_with_disp(buf, src, dest, disp, 8, MOVE_FROMREG);
 }
 
-// FIXME: we don't handle r8-r15 properly in most of these
 static size_t
 mov_disp8_m32_r32(char *buf, enum reg dest, int8_t disp, enum reg src)
 {
-	assert(src != 4);
-	if (buf) {
-		*(buf++) = 0x89;
-		*(buf++) = (MOD_DISP8 << 6) | (src << 3) | dest;
-		*(buf++) = disp;
-	}
-
-	return 3;
+	return _move_between_reg_and_memaddr_in_reg_with_disp(buf, src, dest, disp, 4, MOVE_FROMREG);
 }
 
-// FIXME: we don't handle r8-r15 properly in most of these
 static size_t
 mov_disp8_m16_r16(char *buf, enum reg dest, int8_t disp, enum reg src)
 {
-	assert(src != 4);
-	if (buf) {
-		*(buf++) = OP_SIZE_OVERRIDE;
-		*(buf++) = 0x89;
-		*(buf++) = (MOD_DISP8 << 6) | (src << 3) | dest;
-		*(buf++) = disp;
-	}
-
-	return 4;
+	return _move_between_reg_and_memaddr_in_reg_with_disp(buf, src, dest, disp, 2, MOVE_FROMREG);
 }
 
-// FIXME: we don't handle r8-r15 properly in most of these
 static size_t
 mov_disp8_m8_r8(char *buf, enum reg dest, int8_t disp, enum reg src)
 {
-	assert(src != 4);
-	if (buf) {
-		*(buf++) = 0x88;
-		*(buf++) = (MOD_DISP8 << 6) | (src << 3) | dest;
-		*(buf++) = disp;
-	}
-
-	return 3;
+	return _move_between_reg_and_memaddr_in_reg_with_disp(buf, src, dest, disp, 1, MOVE_FROMREG);
 }
 
 static size_t
 mov_disp8_r64_m64(char *buf, enum reg dest, enum reg src, int8_t disp)
 {
-	assert(src != 4);
-	if (buf) {
-		*(buf++) = REX_W;
-		*(buf++) = 0x8b;
-		*(buf++) = (MOD_DISP8 << 6) | (dest << 3) | src;
-		*(buf++) = disp;
-	}
-
-	return 4;
+	return _move_between_reg_and_memaddr_in_reg_with_disp(buf, dest, src, disp, 8, MOVE_TOREG);
 }
 
 static size_t
 mov_disp8_r32_m32(char *buf, enum reg dest, enum reg src, int8_t disp)
 {
-	assert(src != 4);
-	if (buf) {
-		*(buf++) = 0x8b;
-		*(buf++) = (MOD_DISP8 << 6) | (dest << 3) | src;
-		*(buf++) = disp;
-	}
-
-	return 3;
+	return _move_between_reg_and_memaddr_in_reg_with_disp(buf, dest, src, disp, 4, MOVE_TOREG);
 }
 
 static size_t
 mov_disp8_r16_m16(char *buf, enum reg dest, enum reg src, int8_t disp)
 {
-	assert(src != 4);
-	if (buf) {
-		*(buf++) = OP_SIZE_OVERRIDE;
-		*(buf++) = 0x8b;
-		*(buf++) = (MOD_DISP8 << 6) | (dest << 3) | src;
-		*(buf++) = disp;
-	}
-
-	return 4;
+	return _move_between_reg_and_memaddr_in_reg_with_disp(buf, dest, src, disp, 2, MOVE_TOREG);
 }
 
 static size_t
 mov_disp8_r8_m8(char *buf, enum reg dest, enum reg src, int8_t disp)
 {
-	assert(src != 4);
-	if (buf) {
-		*(buf++) = 0x8A;
-		*(buf++) = (MOD_DISP8 << 6) | (dest << 3) | src;
-		*(buf++) = disp;
-	}
-
-	return 3;
+	return _move_between_reg_and_memaddr_in_reg_with_disp(buf, dest, src, disp, 1, MOVE_TOREG);
 }
 
 static size_t
@@ -594,29 +543,28 @@ ret(char *buf)
 }
 
 static size_t
-push_r64(char *buf, enum reg reg)
+_pushpop_r64(char *buf, uint8_t ioff, enum reg reg)
 {
 	if (buf) {
 		if (reg >= 8)
 			*(buf++) = REX_B;
 
-		*buf = 0x50 + (reg & 7);
+		*buf = 0x50 + ioff + (reg & 7);
 	}
 
 	return reg >= 8 ? 2 : 1;
 }
 
 static size_t
+push_r64(char *buf, enum reg reg)
+{
+	return _pushpop_r64(buf, 0, reg);
+}
+
+static size_t
 pop_r64(char *buf, enum reg reg)
 {
-	if (buf) {
-		if (reg >= 8)
-			*(buf++) = REX_B;
-
-		*buf = 0x58 + (reg & 7);
-	}
-
-	return reg >= 8 ? 2 : 1;
+	return _pushpop_r64(buf, 8, reg);
 }
 
 #define NEXT ins++; assert(ins <= end);
@@ -655,7 +603,7 @@ emitsyscall(char *buf, uint8_t paramcount)
 }
 
 const struct target x64_target = {
-	.reserved = (1 << RSP) | (1 << RBP),
+	.reserved = (1 << RSP) | (1 << RBP) | (1 << R12) | (1 << R13),
 	.emitsyscall = emitsyscall
 };
 
