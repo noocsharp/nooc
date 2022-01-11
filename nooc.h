@@ -248,8 +248,3 @@ struct exprs {
 	size_t len;
 	struct expr *data;
 };
-
-struct target {
-	uint32_t reserved;
-	size_t (*emitsyscall)(char *buf, uint8_t paramcount);
-};

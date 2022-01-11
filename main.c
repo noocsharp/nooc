@@ -13,7 +13,6 @@
 #include "nooc.h"
 #include "ir.h"
 #include "util.h"
-#include "x64.h"
 #include "elf.h"
 #include "lex.h"
 #include "parse.h"
@@ -134,7 +133,6 @@ gentoplevel(struct toplevel *toplevel, struct block *block)
 
 			decl_alloc(block, decl);
 
-			// FIXME: clean this whole thing up
 			if (expr->class == C_PROC) {
 				if (slice_cmplit(&decl->s, "main") == 0) {
 					toplevel->entry = curaddr;
@@ -142,18 +140,8 @@ gentoplevel(struct toplevel *toplevel, struct block *block)
 				assert(expr->kind = EXPR_PROC);
 				blockpush(&expr->d.proc.block);
 				typecheck(&expr->d.proc.block);
-				iproc = (struct iproc){ 0 };
-				iproc.s = decl->s;
-				iproc.addr = curaddr;
-				genproc(&iproc, &(expr->d.proc));
-				array_add((&toplevel->code), iproc);
-				len = emitproc(NULL, &iproc);
-				void *buf = xcalloc(1, len); // FIXME: unnecessary
-				len = emitproc(buf, &iproc);
-				curaddr += len;
-				array_push((&toplevel->text), buf, len);
-				free(buf);
-
+				decl->w.addr = curaddr;
+				curaddr += genproc(decl, &expr->d.proc);
 				blockpop();
 			} else {
 				evalexpr(decl);

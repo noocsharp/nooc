@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <strings.h>
 
 #include "array.h"
@@ -316,18 +317,24 @@ genblock(struct iproc *out, struct block *block)
 	}
 }
 
-void
-genproc(struct iproc *out, struct proc *proc)
+size_t
+genproc(struct decl *decl, struct proc *proc)
 {
 	tmpi = labeli = curi = 1;
 	regs = targ.reserved;
 	struct instr ins;
 	struct type *type;
+	struct iproc iproc = {
+		.s = decl->s,
+		.addr = decl->w.addr,
+	};
+
+	struct iproc *out = &iproc; // for macros to work, a bit hacky
 
 	blockpush(&proc->block);
 
 	// put a blank interval, since tmpi starts at 1
-	array_add((&out->intervals), interval);
+	array_add((&iproc.intervals), interval);
 	size_t i = 0;
 
 	for (size_t j = 0; j < proc->in.len; j++, i++) {
@@ -367,5 +374,14 @@ genproc(struct iproc *out, struct proc *proc)
 		}
 	}
 
+	size_t len = targ.emitproc(NULL, out);
+	void *buf = xcalloc(1, len); // FIXME: unnecessary
+	len = targ.emitproc(buf, out);
+	array_push((&toplevel.text), buf, len);
+	free(buf);
+	array_add((&toplevel.code), iproc);
+
 	blockpop();
+
+	return len;
 }

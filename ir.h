@@ -39,9 +39,9 @@ struct interval {
 struct iproc {
 	size_t len;
 	size_t cap;
-	uint64_t addr;
 	struct instr *data;
-	struct slice s;
+	uint64_t addr; // FIXME: 'addr' and 's' are only necessary because syscalls are intrinsics.
+	struct slice s; // Once syscalls are moved out, we can just use the decl fields and have a pointer to the declaration.
 	struct {
 		size_t len;
 		size_t cap;
@@ -61,4 +61,10 @@ struct toplevel {
 	uint64_t entry;
 };
 
-void genproc(struct iproc *out, struct proc *proc);
+size_t genproc(struct decl *decl, struct proc *proc);
+
+struct target {
+	uint32_t reserved;
+	size_t (*emitsyscall)(char *buf, uint8_t paramcount);
+	size_t (*emitproc)(char *buf, struct iproc *proc);
+};

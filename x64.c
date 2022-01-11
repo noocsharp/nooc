@@ -602,11 +602,6 @@ emitsyscall(char *buf, uint8_t paramcount)
 	return total;
 }
 
-const struct target x64_target = {
-	.reserved = (1 << RSP) | (1 << RBP) | (1 << R12) | (1 << R13),
-	.emitsyscall = emitsyscall
-};
-
 size_t
 emitblock(char *buf, struct iproc *proc, struct instr *start, struct instr *end, uint64_t end_label)
 {
@@ -754,3 +749,9 @@ emitproc(char *buf, struct iproc *proc)
 {
 	return emitblock(buf, proc, NULL, NULL, 0);
 }
+
+const struct target x64_target = {
+	.reserved = (1 << RSP) | (1 << RBP) | (1 << R12) | (1 << R13),
+	.emitsyscall = emitsyscall,
+	.emitproc = emitproc
+};
