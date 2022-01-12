@@ -23,6 +23,8 @@ extern struct toplevel toplevel;
 #define STARTINS(op, val) PUTINS((op), (val)) ; curi++ ;
 #define NEWTMP tmpi++; interval.start = curi + 1; interval.end = curi + 1; array_add((&out->intervals), interval);
 
+#define PTRSIZE 8
+
 extern struct target targ;
 
 static uint64_t tmpi;
@@ -32,6 +34,7 @@ static struct interval interval;
 static uint16_t regs; // used register bitfield
 
 uint64_t out_index;
+struct instr ins;
 
 static uint8_t
 regalloc()
@@ -99,20 +102,66 @@ bumpinterval(struct iproc *out, struct instr *instr, size_t index) {
 	}
 }
 
+static size_t
+assign(struct iproc *out, uint8_t size)
+{
+	size_t t = NEWTMP;
+	STARTINS(IR_ASSIGN, t);
+	PUTINS(IR_SIZE, size);
+	return t;
+}
+
+static size_t
+immediate(struct iproc *out, uint8_t size, uint64_t val)
+{
+	size_t t = NEWTMP;
+	STARTINS(IR_ASSIGN, t);
+	PUTINS(IR_SIZE, size);
+	PUTINS(IR_IMM, val);
+	return t;
+}
+
+static size_t
+load(struct iproc *out, uint8_t size, uint64_t index)
+{
+	size_t t = NEWTMP;
+	STARTINS(IR_ASSIGN, t);
+	PUTINS(IR_SIZE, size);
+	PUTINS(IR_LOAD, index);
+	return t;
+}
+
+static size_t
+alloc(struct iproc *out, uint8_t size, uint64_t count)
+{
+	size_t t = NEWTMP;
+	STARTINS(IR_ASSIGN, t);
+	PUTINS(IR_SIZE, size);
+	PUTINS(IR_ALLOC, count);
+	return t;
+}
+
+static size_t
+store(struct iproc *out, uint8_t size, uint64_t src, uint64_t dest)
+{
+	size_t t = NEWTMP;
+	PUTINS(IR_SIZE, size);
+	PUTINS(IR_STORE, src);
+	PUTINS(IR_EXTRA, dest);
+	return t;
+}
+
 static uint64_t
 genexpr(struct iproc *out, size_t expri)
 {
-	struct instr ins;
 	struct expr *expr = &exprs.data[expri];
-	uint64_t what = 0;
+	uint64_t temp1 = 0, temp2 = 0;
 	switch (expr->kind) {
 	case EXPR_LIT:
 		switch (expr->class) {
 		case C_INT:
-			what = NEWTMP;
-			STARTINS(IR_ASSIGN, what);
-			PUTINS(IR_SIZE, 8); // FIXME: should not be hardcoded
-			PUTINS(IR_IMM, expr->d.v.v.i64);
+			// FIXME: size should not be hardcoded
+			temp1 = immediate(out, 8, expr->d.v.v.i64);
 			break;
 		default:
 			die("genexpr: EXPR_LIT: unhandled class");
@@ -121,42 +170,30 @@ genexpr(struct iproc *out, size_t expri)
 	case EXPR_IDENT: {
 		struct decl *decl = finddecl(expr->d.s);
 		struct type *type = &types.data[decl->type];
-		uint64_t where;
 		if (decl->toplevel) {
-			where = NEWTMP;
-			STARTINS(IR_ASSIGN, where);
-			PUTINS(IR_SIZE, 8); // FIXME: should not be hardcoded
-			PUTINS(IR_IMM, decl->w.addr);
+			temp2 = immediate(out, PTRSIZE, decl->w.addr);
 
-			what = NEWTMP;
-			STARTINS(IR_ASSIGN, what);
 			switch (type->size) {
 			case 1:
 			case 2:
 			case 4:
 			case 8:
-				PUTINS(IR_SIZE, type->size);
+				temp1 = load(out, type->size, temp2);
 				break;
 			default:
 				die("genexpr: unknown size");
 			}
-			PUTINS(IR_LOAD, where);
 		} else if (decl->in) {
-			what = decl->index;
+			temp1 = decl->index;
 		} else {
-			what = NEWTMP;
-			STARTINS(IR_ASSIGN, what);
-			PUTINS(IR_SIZE, 8); // FIXME: should not be hardcoded
-			PUTINS(IR_LOAD, decl->index);
+			temp1 = load(out, PTRSIZE, decl->index);
 		}
 		break;
 	}
 	case EXPR_BINARY: {
 		uint64_t left = genexpr(out, expr->d.bop.left);
 		uint64_t right = genexpr(out, expr->d.bop.right);
-		what = NEWTMP;
-		STARTINS(IR_ASSIGN, what);
-		PUTINS(IR_SIZE, 8);
+		temp1 = assign(out, PTRSIZE);
 		switch (expr->d.bop.kind) {
 		case BOP_PLUS:
 			PUTINS(IR_ADD, left); // FIXME: operand size?
@@ -178,12 +215,9 @@ genexpr(struct iproc *out, size_t expri)
 			struct decl *decl = finddecl(operand->d.s);
 			// a global
 			if (decl->toplevel) {
-				what = NEWTMP;
-				STARTINS(IR_ASSIGN, what);
-				PUTINS(IR_SIZE, 8); // FIXME: should not be hardcoded
-				PUTINS(IR_IMM, decl->w.addr);
+				temp1 = immediate(out, PTRSIZE, decl->w.addr);
 			} else {
-				what = decl->index;
+				temp1 = decl->index;
 			}
 			break;
 		}
@@ -193,7 +227,7 @@ genexpr(struct iproc *out, size_t expri)
 		break;
 	}
 	case EXPR_FCALL: {
-		what = 1; // value doesn't matter
+		temp1 = 1; // value doesn't matter
 		uint64_t proc = procindex(&expr->d.call.name);
 		size_t params[20];
 		assert(expr->d.call.params.len < 20);
@@ -202,10 +236,8 @@ genexpr(struct iproc *out, size_t expri)
 		}
 		if (!out_index) {
 			// allocate memory even if we don't need to store the return value
-			out_index = NEWTMP;
-			STARTINS(IR_ASSIGN, out_index);
-			PUTINS(IR_SIZE, 8); // don't hardcode size
-			PUTINS(IR_ALLOC, 1); // don't hardcode size
+			// FIXME: don't hardcode sizes
+			out_index = alloc(out, 8, 1);
 		}
 		params[expr->d.call.params.len] = out_index;
 		STARTINS(IR_CALL, proc);
@@ -217,7 +249,7 @@ genexpr(struct iproc *out, size_t expri)
 		break;
 	}
 	case EXPR_COND: {
-		what = 1; // this doesn't matter until we add ternary-like usage
+		temp1 = 1; // this doesn't matter until we add ternary-like usage
 		size_t condtmp = genexpr(out, expr->d.cond.cond);
 		size_t elselabel = labeli++;
 		size_t endlabel = labeli++;
@@ -234,8 +266,8 @@ genexpr(struct iproc *out, size_t expri)
 		die("genexpr: expr kind");
 	}
 
-	assert(what);
-	return what;
+	assert(temp1);
+	return temp1;
 }
 
 static void
@@ -253,19 +285,16 @@ genblock(struct iproc *out, struct block *block)
 		case ITEM_DECL:
 			decl = &block->decls.data[item->idx];
 			type = &types.data[decl->type];
-			decl->index = NEWTMP;
-			STARTINS(IR_ASSIGN, (decl->index));
 			switch (type->size) {
 			case 1:
 			case 2:
 			case 4:
 			case 8:
-				PUTINS(IR_SIZE, type->size);
+				decl->index = alloc(out, type->size, 1);
 				break;
 			default:
 				die("ir_genproc: unknown size");
 			}
-			PUTINS(IR_ALLOC, 1);
 			if (exprs.data[decl->val].kind == EXPR_FCALL) {
 				out_index = decl->index;
 				what = genexpr(out, decl->val);
@@ -276,13 +305,11 @@ genblock(struct iproc *out, struct block *block)
 				case 2:
 				case 4:
 				case 8:
-					STARTINS(IR_SIZE, type->size);
+					store(out, type->size, what, decl->index);
 					break;
 				default:
 					die("ir_genproc: unknown size");
 				}
-				PUTINS(IR_STORE, what);
-				PUTINS(IR_EXTRA, decl->index);
 			}
 			break;
 		case ITEM_ASSGN:
@@ -299,13 +326,11 @@ genblock(struct iproc *out, struct block *block)
 				case 2:
 				case 4:
 				case 8:
-					STARTINS(IR_SIZE, type->size);
+					store(out, type->size, what, decl->index);
 					break;
 				default:
 					die("ir_genproc: unknown size");
 				}
-				PUTINS(IR_STORE, what);
-				PUTINS(IR_EXTRA, decl->index);
 			}
 			break;
 		case ITEM_EXPR:
