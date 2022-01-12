@@ -567,6 +567,14 @@ pop_r64(char *buf, enum reg reg)
 	return _pushpop_r64(buf, 8, reg);
 }
 
+static size_t emitsyscall(char *buf, uint8_t paramcount);
+
+const struct target x64_target = {
+	.reserved = (1 << RSP) | (1 << RBP) | (1 << R12) | (1 << R13),
+	.emitsyscall = emitsyscall,
+	.emitproc = emitproc
+};
+
 #define NEXT ins++; assert(ins <= end);
 
 static size_t
@@ -608,9 +616,11 @@ emitblock(char *buf, struct iproc *proc, struct instr *start, struct instr *end,
 	struct instr *ins = start ? start : proc->data;
 	end = end ? end : &proc->data[proc->len];
 
+	uint16_t active = 0;
+
 	uint64_t dest, src, size, count, tmp, label;
 	int64_t offset;
-	uint64_t localalloc = 0;
+	uint64_t localalloc = 0, curi = 0;
 
 	size_t total = 0;
 	if (!start) {
@@ -619,6 +629,14 @@ emitblock(char *buf, struct iproc *proc, struct instr *start, struct instr *end,
 	}
 
 	while (ins < end) {
+		curi++;
+		for (size_t j = 0; j < proc->intervals.len; j++) {
+			if ((active & (1 << j)) && proc->intervals.data[j].end == curi - 1)
+				active &= ~(1 << proc->intervals.data[j].reg);
+
+			if (!(active & (1 << j)) && proc->intervals.data[j].start == curi)
+				active |= 1 << proc->intervals.data[j].reg;
+		}
 		switch (ins->op) {
 		// FIXME: we don't handle jumps backward yet
 		case IR_JUMP:
@@ -663,6 +681,7 @@ emitblock(char *buf, struct iproc *proc, struct instr *start, struct instr *end,
 				total += cmp_r64_r64(buf ? buf + total : NULL, dest, proc->intervals.data[ins->id].reg);
 				NEXT;
 				if (ins->op == IR_CONDJUMP) {
+					curi++;
 					label = ins->id;
 					NEXT;
 					assert(ins->op == IR_EXTRA);
@@ -705,7 +724,9 @@ emitblock(char *buf, struct iproc *proc, struct instr *start, struct instr *end,
 			dest = ins->id;
 
 			for (int i = 0; i < 16; i++) {
-				total += push_r64(buf ? buf + total : NULL, i);
+				if (active & (1 << i)) {
+					total += push_r64(buf ? buf + total : NULL, i);
+				}
 			}
 
 			NEXT;
@@ -721,7 +742,9 @@ emitblock(char *buf, struct iproc *proc, struct instr *start, struct instr *end,
 			// FIXME: this won't work with non-64-bit things
 			total += add_r64_imm(buf ? buf + total : NULL, RSP, 8*count);
 			for (int i = 15; i >= 0; i--) {
-				total += pop_r64(buf ? buf + total : NULL, i);
+				if (active & (1 << i)) {
+					total += pop_r64(buf ? buf + total : NULL, i);
+				}
 			}
 			break;
 		case IR_LABEL:
@@ -749,9 +772,3 @@ emitproc(char *buf, struct iproc *proc)
 {
 	return emitblock(buf, proc, NULL, NULL, 0);
 }
-
-const struct target x64_target = {
-	.reserved = (1 << RSP) | (1 << RBP) | (1 << R12) | (1 << R13),
-	.emitsyscall = emitsyscall,
-	.emitproc = emitproc
-};
