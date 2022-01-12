@@ -155,7 +155,7 @@ genexpr(struct iproc *out, size_t expri)
 		uint64_t right = genexpr(out, expr->d.bop.right);
 		what = NEWTMP;
 		STARTINS(IR_ASSIGN, what);
-		STARTINS(IR_SIZE, 8);
+		PUTINS(IR_SIZE, 8);
 		switch (expr->d.bop.kind) {
 		case BOP_PLUS:
 			PUTINS(IR_ADD, left); // FIXME: operand size?
@@ -211,6 +211,8 @@ genexpr(struct iproc *out, size_t expri)
 		for (size_t i = expr->d.call.params.len; i <= expr->d.call.params.len; i--) {
 			PUTINS(IR_CALLARG, params[i]);
 		}
+
+		out_index = 0;
 		break;
 	}
 	case EXPR_COND: {
@@ -309,7 +311,7 @@ genblock(struct iproc *out, struct block *block)
 			genexpr(out, item->idx);
 			break;
 		case ITEM_RETURN:
-			PUTINS(IR_RETURN, 0);
+			STARTINS(IR_RETURN, 0);
 			break;
 		default:
 			die("ir_genproc: unreachable");
