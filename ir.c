@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <strings.h>
 
 #include "array.h"
@@ -20,7 +21,7 @@ extern struct toplevel toplevel;
 
 #define PUTINS(op, val) ins = (struct instr){(op), (val)} ; bumpinterval(out, &ins, val) ; array_add(out, ins) ;
 #define STARTINS(op, val) PUTINS((op), (val)) ; curi++ ;
-#define NEWTMP tmpi++; interval.active = 0; interval.start = curi + 1; interval.end = curi + 1; array_add((&out->intervals), interval);
+#define NEWTMP tmpi++; interval.start = curi + 1; interval.end = curi + 1; array_add((&out->intervals), interval);
 
 extern struct target targ;
 
@@ -319,6 +320,29 @@ genblock(struct iproc *out, struct block *block)
 	}
 }
 
+static void
+chooseregs(struct iproc *proc)
+{
+	bool active[proc->intervals.len];
+	memset(active, 0, proc->intervals.len * sizeof(*active));
+
+	// FIXME: this is obviously not close to optimal
+	for (uint64_t i = 0; i <= curi; i++) {
+		for (size_t j = 0; j < proc->intervals.len; j++) {
+			if (active[j] && proc->intervals.data[j].end == i - 1) {
+				active[j] = false;
+				regfree(proc->intervals.data[j].reg);
+			}
+
+			if (!active[j] && proc->intervals.data[j].start == i) {
+				active[j] = true;
+				proc->intervals.data[j].reg = regalloc();
+			}
+		}
+	}
+
+}
+
 size_t
 genproc(struct decl *decl, struct proc *proc)
 {
@@ -361,20 +385,7 @@ genproc(struct decl *decl, struct proc *proc)
 
 	genblock(out, &proc->block);
 
-	// FIXME: this is obviously not close to optimal
-	for (uint64_t i = 0; i <= curi; i++) {
-		for (size_t j = 0; j < out->intervals.len; j++) {
-			if (out->intervals.data[j].active && out->intervals.data[j].end == i - 1) {
-				out->intervals.data[j].active = false;
-				regfree(out->intervals.data[j].reg);
-			}
-
-			if (!out->intervals.data[j].active && out->intervals.data[j].start == i) {
-				out->intervals.data[j].active = true;
-				out->intervals.data[j].reg = regalloc();
-			}
-		}
-	}
+	chooseregs(&iproc);
 
 	size_t len = targ.emitproc(NULL, out);
 	void *buf = xcalloc(1, len); // FIXME: unnecessary

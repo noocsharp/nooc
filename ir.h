@@ -32,7 +32,6 @@ struct instr {
 struct interval {
 	uint64_t start;
 	uint64_t end;
-	bool active;
 	uint8_t reg;
 };
 
