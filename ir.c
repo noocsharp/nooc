@@ -83,7 +83,6 @@ bumpinterval(struct iproc *out, struct instr *instr, size_t index) {
 	case IR_LABEL:
 	case IR_CONDJUMP:
 	case IR_JUMP:
-	case IR_SIZE:
 	case IR_ALLOC:
 		break;
 	case IR_STORE:
@@ -106,7 +105,7 @@ assign(struct iproc *out, uint8_t size)
 {
 	size_t t = NEWTMP;
 	STARTINS(IR_ASSIGN, t);
-	PUTINS(IR_SIZE, size);
+	out->temps.data[t].size = size;
 	return t;
 }
 
@@ -115,7 +114,7 @@ immediate(struct iproc *out, uint8_t size, uint64_t val)
 {
 	size_t t = NEWTMP;
 	STARTINS(IR_ASSIGN, t);
-	PUTINS(IR_SIZE, size);
+	out->temps.data[t].size = size;
 	PUTINS(IR_IMM, val);
 	return t;
 }
@@ -125,7 +124,7 @@ load(struct iproc *out, uint8_t size, uint64_t index)
 {
 	size_t t = NEWTMP;
 	STARTINS(IR_ASSIGN, t);
-	PUTINS(IR_SIZE, size);
+	out->temps.data[t].size = size;
 	PUTINS(IR_LOAD, index);
 	return t;
 }
@@ -135,19 +134,17 @@ alloc(struct iproc *out, uint8_t size, uint64_t count)
 {
 	size_t t = NEWTMP;
 	STARTINS(IR_ASSIGN, t);
-	PUTINS(IR_SIZE, size);
+	out->temps.data[t].size = size;
+	out->temps.data[t].flags = TF_PTR;
 	PUTINS(IR_ALLOC, count);
 	return t;
 }
 
-static size_t
+static void
 store(struct iproc *out, uint8_t size, uint64_t src, uint64_t dest)
 {
-	size_t t = NEWTMP;
-	PUTINS(IR_SIZE, size);
-	PUTINS(IR_STORE, src);
+	STARTINS(IR_STORE, src);
 	PUTINS(IR_EXTRA, dest);
-	return t;
 }
 
 static uint64_t
@@ -393,7 +390,8 @@ genproc(struct decl *decl, struct proc *proc)
 		size_t what = NEWTMP;
 		decl->index = what;
 		STARTINS(IR_ASSIGN, what);
-		PUTINS(IR_SIZE, type->size);
+		iproc.temps.data[what].flags = TF_INT; // FIXME: move this to a separate function?
+		iproc.temps.data[what].size = type->size; // FIXME: should we check that it's a power of 2?
 		PUTINS(IR_IN, i);
 	}
 
@@ -403,7 +401,8 @@ genproc(struct decl *decl, struct proc *proc)
 		size_t what = NEWTMP;
 		decl->index = what;
 		STARTINS(IR_ASSIGN, what);
-		PUTINS(IR_SIZE, 8);
+		iproc.temps.data[what].flags = TF_PTR; // FIXME: move this to a separate function?
+		iproc.temps.data[what].size = type->size; // FIXME: should we check that it's a power of 2?
 		PUTINS(IR_IN, i);
 	}
 

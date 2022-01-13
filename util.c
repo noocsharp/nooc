@@ -141,9 +141,6 @@ dumpir(struct iproc *instrs)
 		case IR_IN:
 			fprintf(stderr, "in %lu\n", instr->val);
 			break;
-		case IR_SIZE:
-			fprintf(stderr, "s%lu ", instr->val);
-			break;
 		case IR_IMM:
 			fprintf(stderr, "imm %lu\n", instr->val);
 			break;

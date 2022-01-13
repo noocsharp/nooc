@@ -692,29 +692,16 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 			total += ret(text);
 			NEXT;
 			break;
-		case IR_SIZE:
-			size = ins->val;
+		case IR_STORE:
+			src = proc->temps.data[ins->val].reg;
 			NEXT;
-
-			switch (ins->op) {
-			case IR_STORE:
-				src = proc->temps.data[ins->val].reg;
-				NEXT;
-				assert(ins->op == IR_EXTRA);
-				total += mov_mr64_r64(text, proc->temps.data[ins->val].reg, src);
-				NEXT;
-				break;
-			default:
-				die("x64 emitblock: unhandled size instruction");
-			}
+			assert(ins->op == IR_EXTRA);
+			total += mov_mr64_r64(text, proc->temps.data[ins->val].reg, src);
+			NEXT;
 			break;
 		case IR_ASSIGN:
 			tmp = ins->val;
 			dest = proc->temps.data[ins->val].reg;
-			NEXT;
-
-			assert(ins->op == IR_SIZE);
-			size = ins->val;
 			NEXT;
 
 			switch (ins->op) {
@@ -773,7 +760,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 			}
 
 			NEXT;
-			while (ins->op == IR_CALLARG) {
+			while (ins < end && ins->op == IR_CALLARG) {
 				count++;
 				total += push_r64(text, proc->temps.data[ins->val].reg);
 				NEXT;
@@ -796,7 +783,6 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 
 			NEXT;
 			break;
-		case IR_STORE:
 		case IR_IMM:
 		case IR_ALLOC:
 			die("x64 emitblock: invalid start of instruction");

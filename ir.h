@@ -24,7 +24,6 @@ struct instr {
 		IR_ASSIGN,
 		IR_CALLARG,
 		IR_IN,
-		IR_SIZE,
 		IR_EXTRA,
 	} op;
 };
@@ -32,6 +31,11 @@ struct instr {
 struct temp {
 	uint64_t start;
 	uint64_t end;
+	enum {
+		TF_PTR,
+		TF_INT,
+	} flags;
+	uint8_t size;
 	uint8_t reg;
 };
 
