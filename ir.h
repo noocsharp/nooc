@@ -64,6 +64,6 @@ size_t genproc(struct decl *decl, struct proc *proc);
 
 struct target {
 	uint32_t reserved;
-	size_t (*emitsyscall)(char *buf, uint8_t paramcount);
-	size_t (*emitproc)(char *buf, struct iproc *proc);
+	size_t (*emitsyscall)(struct data *text, uint8_t paramcount);
+	size_t (*emitproc)(struct data *text, struct iproc *proc);
 };

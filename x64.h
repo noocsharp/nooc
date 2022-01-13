@@ -19,5 +19,3 @@ enum reg {
 
 extern char abi_arg[];
 extern unsigned short used_reg;
-
-size_t emitproc(char *buf, struct iproc *proc);

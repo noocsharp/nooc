@@ -17,7 +17,7 @@
 
 #include <assert.h>
 #include <stdint.h>
-#include <stdio.h>
+#include <stddef.h>
 
 /* default: SipHash-2-4 */
 #ifndef cROUNDS
@@ -65,6 +65,7 @@
 
 #ifdef DEBUG
 #define TRACE                                                                  \
+#include <stdio.h>
     do {                                                                       \
         printf("(%3zu) v0 %016" PRIx64 "\n", inlen, v0);                       \
         printf("(%3zu) v1 %016" PRIx64 "\n", inlen, v1);                       \

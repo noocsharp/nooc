@@ -102,7 +102,6 @@ gentoplevel(struct toplevel *toplevel, struct block *block)
 	char syscallname[] = "syscall0";
 	blockpush(block);
 	typecheck(block);
-	size_t len = 0;
 	struct iproc iproc = { 0 };
 	uint64_t curaddr = TEXT_OFFSET;
 
@@ -111,13 +110,8 @@ gentoplevel(struct toplevel *toplevel, struct block *block)
 		syscallname[7]++;
 		iproc.s.data = strdup(syscallname);
 		iproc.addr = curaddr;
-		len = targ.emitsyscall(NULL, i);
-		void *buf = xcalloc(1, len); // FIXME: unnecessary
-		len = targ.emitsyscall(buf, i);
-		array_push((&toplevel->text), buf, len);
-		free(buf);
 		array_add((&toplevel->code), iproc);
-		curaddr += len;
+		curaddr += targ.emitsyscall(&toplevel->text, i);
 	}
 	for (int i = 0; i < block->len; i++) {
 		struct item *item = &block->data[i];

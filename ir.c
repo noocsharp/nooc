@@ -2,7 +2,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -409,17 +408,10 @@ genproc(struct decl *decl, struct proc *proc)
 	}
 
 	genblock(out, &proc->block);
-
 	chooseregs(&iproc);
-
-	size_t len = targ.emitproc(NULL, out);
-	void *buf = xcalloc(1, len); // FIXME: unnecessary
-	len = targ.emitproc(buf, out);
-	array_push((&toplevel.text), buf, len);
-	free(buf);
 	array_add((&toplevel.code), iproc);
 
 	blockpop();
 
-	return len;
+	return targ.emitproc(&toplevel.text, out);
 }

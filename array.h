@@ -1,6 +1,9 @@
 #define array_add(arr, new) \
 	_array_add((void **) &(arr->data), &(arr->len), &(arr->cap), &new, sizeof(new), 1);
 
+#define array_addlit(arr, new) \
+	do {temp = new; array_add(arr, temp); } while (0);
+
 #define array_push(arr, new, count) \
 	_array_add((void **) &(arr->data), &(arr->len), &(arr->cap), new, sizeof(*(arr->data)), count);
 
