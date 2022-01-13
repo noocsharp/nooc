@@ -29,7 +29,7 @@ struct instr {
 	} op;
 };
 
-struct interval {
+struct temp {
 	uint64_t start;
 	uint64_t end;
 	uint8_t reg;
@@ -44,8 +44,8 @@ struct iproc {
 	struct {
 		size_t len;
 		size_t cap;
-		struct interval *data;
-	} intervals;
+		struct temp *data;
+	} temps;
 };
 
 struct iprocs {

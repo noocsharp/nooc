@@ -20,7 +20,7 @@ extern struct toplevel toplevel;
 
 #define PUTINS(op, val) ins = (struct instr){(val), (op)} ; bumpinterval(out, &ins, val) ; array_add(out, ins) ;
 #define STARTINS(op, val) PUTINS((op), (val)) ; curi++ ;
-#define NEWTMP tmpi++; interval.start = curi + 1; interval.end = curi + 1; array_add((&out->intervals), interval);
+#define NEWTMP tmpi++; interval.start = curi + 1; interval.end = curi + 1; array_add((&out->temps), interval);
 
 #define PTRSIZE 8
 
@@ -29,7 +29,7 @@ extern struct target targ;
 static uint64_t tmpi;
 static uint64_t labeli;
 static uint64_t curi;
-static struct interval interval;
+static struct temp interval;
 static uint16_t regs; // used register bitfield
 
 uint64_t out_index;
@@ -94,7 +94,7 @@ bumpinterval(struct iproc *out, struct instr *instr, size_t index) {
 	case IR_CALLARG:
 	case IR_IN:
 	case IR_EXTRA:
-		out->intervals.data[index].end = curi;
+		out->temps.data[index].end = curi;
 		break;
 	default:
 		die("bumpinterval");
@@ -347,20 +347,20 @@ genblock(struct iproc *out, struct block *block)
 static void
 chooseregs(struct iproc *proc)
 {
-	bool active[proc->intervals.len];
-	memset(active, 0, proc->intervals.len * sizeof(*active));
+	bool active[proc->temps.len];
+	memset(active, 0, proc->temps.len * sizeof(*active));
 
 	// FIXME: this is obviously not close to optimal
 	for (uint64_t i = 0; i <= curi; i++) {
-		for (size_t j = 0; j < proc->intervals.len; j++) {
-			if (active[j] && proc->intervals.data[j].end == i - 1) {
+		for (size_t j = 0; j < proc->temps.len; j++) {
+			if (active[j] && proc->temps.data[j].end == i - 1) {
 				active[j] = false;
-				regfree(proc->intervals.data[j].reg);
+				regfree(proc->temps.data[j].reg);
 			}
 
-			if (!active[j] && proc->intervals.data[j].start == i) {
+			if (!active[j] && proc->temps.data[j].start == i) {
 				active[j] = true;
-				proc->intervals.data[j].reg = regalloc();
+				proc->temps.data[j].reg = regalloc();
 			}
 		}
 	}
@@ -384,7 +384,7 @@ genproc(struct decl *decl, struct proc *proc)
 	blockpush(&proc->block);
 
 	// put a blank interval, since tmpi starts at 1
-	array_add((&iproc.intervals), interval);
+	array_add((&iproc.temps), interval);
 	size_t i = 0;
 
 	for (size_t j = 0; j < proc->in.len; j++, i++) {
