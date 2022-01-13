@@ -18,7 +18,7 @@ extern struct exprs exprs;
 extern struct assgns assgns;
 extern struct toplevel toplevel;
 
-#define PUTINS(op, val) ins = (struct instr){(op), (val)} ; bumpinterval(out, &ins, val) ; array_add(out, ins) ;
+#define PUTINS(op, val) ins = (struct instr){(val), (op)} ; bumpinterval(out, &ins, val) ; array_add(out, ins) ;
 #define STARTINS(op, val) PUTINS((op), (val)) ; curi++ ;
 #define NEWTMP tmpi++; interval.start = curi + 1; interval.end = curi + 1; array_add((&out->intervals), interval);
 

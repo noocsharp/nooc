@@ -683,7 +683,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 		switch (ins->op) {
 		// FIXME: we don't handle jumps backward yet
 		case IR_JUMP:
-			total += jmp(text, emitblock(NULL, proc, ins + 1, end, ins->id));
+			total += jmp(text, emitblock(NULL, proc, ins + 1, end, ins->val));
 			NEXT;
 			break;
 		case IR_RETURN:
@@ -693,15 +693,15 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 			NEXT;
 			break;
 		case IR_SIZE:
-			size = ins->id;
+			size = ins->val;
 			NEXT;
 
 			switch (ins->op) {
 			case IR_STORE:
-				src = proc->intervals.data[ins->id].reg;
+				src = proc->intervals.data[ins->val].reg;
 				NEXT;
 				assert(ins->op == IR_EXTRA);
-				total += mov_mr64_r64(text, proc->intervals.data[ins->id].reg, src);
+				total += mov_mr64_r64(text, proc->intervals.data[ins->val].reg, src);
 				NEXT;
 				break;
 			default:
@@ -709,47 +709,47 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 			}
 			break;
 		case IR_ASSIGN:
-			tmp = ins->id;
-			dest = proc->intervals.data[ins->id].reg;
+			tmp = ins->val;
+			dest = proc->intervals.data[ins->val].reg;
 			NEXT;
 
 			assert(ins->op == IR_SIZE);
-			size = ins->id;
+			size = ins->val;
 			NEXT;
 
 			switch (ins->op) {
 			case IR_CEQ:
-				total += mov_r64_r64(text, dest, proc->intervals.data[ins->id].reg);
+				total += mov_r64_r64(text, dest, proc->intervals.data[ins->val].reg);
 				NEXT;
-				total += cmp_r64_r64(text, dest, proc->intervals.data[ins->id].reg);
+				total += cmp_r64_r64(text, dest, proc->intervals.data[ins->val].reg);
 				NEXT;
 				if (ins->op == IR_CONDJUMP) {
 					curi++;
-					label = ins->id;
+					label = ins->val;
 					NEXT;
 					assert(ins->op == IR_EXTRA);
-					if (ins->id == tmp) {
+					if (ins->val == tmp) {
 						total += jne(text, emitblock(NULL, proc, ins + 1, end, label));
 					}
 					NEXT;
 				}
 				break;
 			case IR_ADD:
-				total += mov_r64_r64(text, dest, proc->intervals.data[ins->id].reg);
+				total += mov_r64_r64(text, dest, proc->intervals.data[ins->val].reg);
 				NEXT;
-				total += add_r64_r64(text, dest, proc->intervals.data[ins->id].reg);
+				total += add_r64_r64(text, dest, proc->intervals.data[ins->val].reg);
 				NEXT;
 				break;
 			case IR_IMM:
-				total += mov_r64_imm(text, dest, ins->id);
+				total += mov_r64_imm(text, dest, ins->val);
 				NEXT;
 				break;
 			case IR_IN:
-				total += mov_disp8_r64_m64(text, dest, RBP, 8*ins->id + 16);
+				total += mov_disp8_r64_m64(text, dest, RBP, 8*ins->val + 16);
 				NEXT;
 				break;
 			case IR_LOAD:
-				total += mov_r64_mr64(text, dest, proc->intervals.data[ins->id].reg);
+				total += mov_r64_mr64(text, dest, proc->intervals.data[ins->val].reg);
 				NEXT;
 				break;
 			case IR_ALLOC:
@@ -764,7 +764,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 			break;
 		case IR_CALL:
 			count = 0;
-			dest = ins->id;
+			dest = ins->val;
 
 			for (int i = 0; i < 16; i++) {
 				if (active & (1 << i)) {
@@ -775,7 +775,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 			NEXT;
 			while (ins->op == IR_CALLARG) {
 				count++;
-				total += push_r64(text, proc->intervals.data[ins->id].reg);
+				total += push_r64(text, proc->intervals.data[ins->val].reg);
 				NEXT;
 			}
 
@@ -791,7 +791,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 			}
 			break;
 		case IR_LABEL:
-			if (ins->id == end_label)
+			if (ins->val == end_label)
 				goto done;
 
 			NEXT;

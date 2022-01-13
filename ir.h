@@ -1,4 +1,5 @@
 struct instr {
+	uint64_t val;
 	enum {
 		IR_NONE,
 
@@ -26,7 +27,6 @@ struct instr {
 		IR_SIZE,
 		IR_EXTRA,
 	} op;
-	uint64_t id;
 };
 
 struct interval {
