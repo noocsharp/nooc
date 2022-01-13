@@ -6,9 +6,27 @@
 
 #include "nooc.h"
 #include "ir.h"
-#include "x64.h"
 #include "util.h"
 #include "array.h"
+
+enum reg {
+	RAX,
+	RCX,
+	RDX,
+	RBX,
+	RSP,
+	RBP,
+	RSI,
+	RDI,
+	R8,
+	R9,
+	R10,
+	R11,
+	R12,
+	R13,
+	R14,
+	R15,
+};
 
 enum rex {
 	REX_B = 0x41,
