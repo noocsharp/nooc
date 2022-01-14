@@ -972,7 +972,6 @@ done:
 	return total;
 }
 
-// FIXME: use array_push
 size_t
 emitproc(struct data *text, struct iproc *proc)
 {
