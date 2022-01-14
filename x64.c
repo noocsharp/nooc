@@ -415,6 +415,36 @@ mov_disp8_r8_m8(struct data *text, enum reg dest, enum reg src, int8_t disp)
 }
 
 static size_t
+movzx_r8_r64(struct data *text, enum reg dest, enum reg src)
+{
+	uint8_t temp;
+	uint8_t rex = REX_W | (dest >= 8 ? REX_R : 0) | (src >= 8 ? REX_B : 0);
+	if (text) {
+		array_addlit(text, rex);
+		array_addlit(text, 0x0F);
+		array_addlit(text, 0xB6);
+		array_addlit(text, (MOD_DIRECT << 6) | (dest << 3) | src);
+	}
+
+	return 4;
+}
+
+static size_t
+movzx_r16_r64(struct data *text, enum reg dest, enum reg src)
+{
+	uint8_t temp;
+	uint8_t rex = REX_W | (dest >= 8 ? REX_R : 0) | (src >= 8 ? REX_B : 0);
+	if (text) {
+		array_addlit(text, rex);
+		array_addlit(text, 0x0F);
+		array_addlit(text, 0xB7);
+		array_addlit(text, (MOD_DIRECT << 6) | (dest << 3) | src);
+	}
+
+	return 4;
+}
+
+static size_t
 lea_disp8(struct data *text, enum reg dest, enum reg src, int8_t disp)
 {
 	uint8_t temp;
@@ -702,6 +732,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 		case IR_ASSIGN:
 			tmp = ins->val;
 			dest = proc->temps.data[ins->val].reg;
+			size = proc->temps.data[ins->val].size;
 			NEXT;
 
 			switch (ins->op) {
@@ -727,6 +758,23 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 				total += add_r64_r64(text, dest, proc->temps.data[ins->val].reg);
 				NEXT;
 				break;
+			case IR_ZEXT:
+				assert(size == 8); // FIXME: should handle all sizes
+				switch (proc->temps.data[ins->val].size) {
+				case 1:
+					total += movzx_r8_r64(text, dest, proc->temps.data[ins->val].reg);
+					break;
+				case 2:
+					total += movzx_r16_r64(text, dest, proc->temps.data[ins->val].reg);
+					break;
+				case 4: // upper 32-bits get cleared automatically in x64
+					total += mov_r32_r32(text, dest, proc->temps.data[ins->val].reg);
+					break;
+				default:
+					die("x64 emitblock: IR_ZEXT, bad size");
+				}
+				NEXT;
+				break;
 			case IR_IMM:
 				total += mov_r64_imm(text, dest, ins->val);
 				NEXT;
@@ -736,7 +784,22 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 				NEXT;
 				break;
 			case IR_LOAD:
-				total += mov_r64_mr64(text, dest, proc->temps.data[ins->val].reg);
+				switch (size) {
+				case 8:
+					total += mov_r64_mr64(text, dest, proc->temps.data[ins->val].reg);
+					break;
+				case 4:
+					total += mov_r32_mr32(text, dest, proc->temps.data[ins->val].reg);
+					break;
+				case 2:
+					total += mov_r16_mr16(text, dest, proc->temps.data[ins->val].reg);
+					break;
+				case 1:
+					total += mov_r8_mr8(text, dest, proc->temps.data[ins->val].reg);
+					break;
+				default:
+					die("x64 emitblock: IR_LOAD: bad size");
+				}
 				NEXT;
 				break;
 			case IR_ALLOC:
@@ -787,7 +850,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 		case IR_ALLOC:
 			die("x64 emitblock: invalid start of instruction");
 		default:
-			die("x64 emitproc: unknown instruction");
+			die("x64 emitblock: unknown instruction");
 		}
 	}
 

@@ -89,6 +89,7 @@ bumpinterval(struct iproc *out, struct instr *instr, size_t index) {
 	case IR_LOAD:
 	case IR_ADD:
 	case IR_CEQ:
+	case IR_ZEXT:
 	case IR_ASSIGN:
 	case IR_CALLARG:
 	case IR_IN:
@@ -182,25 +183,33 @@ genexpr(struct iproc *out, size_t expri)
 		} else if (decl->in) {
 			temp1 = decl->index;
 		} else {
-			temp1 = load(out, PTRSIZE, decl->index);
+			temp1 = load(out, type->size, decl->index);
 		}
 		break;
 	}
 	case EXPR_BINARY: {
-		uint64_t left = genexpr(out, expr->d.bop.left);
-		uint64_t right = genexpr(out, expr->d.bop.right);
+		uint64_t left = genexpr(out, expr->d.bop.left), left2;
+		uint64_t right = genexpr(out, expr->d.bop.right), right2;
+		if (out->temps.data[left].size < out->temps.data[right].size) {
+			left2 = assign(out, out->temps.data[right].size);
+			PUTINS(IR_ZEXT, left);
+		} else left2 = left;
+		if (out->temps.data[left].size > out->temps.data[right].size) {
+			right2 = assign(out, out->temps.data[left].size);
+			PUTINS(IR_ZEXT, right);
+		} else right2 = right;
 		temp1 = assign(out, PTRSIZE);
 		switch (expr->d.bop.kind) {
 		case BOP_PLUS:
-			PUTINS(IR_ADD, left); // FIXME: operand size?
+			PUTINS(IR_ADD, left2); // FIXME: operand size?
 			break;
 		case BOP_EQUAL:
-			PUTINS(IR_CEQ, left);
+			PUTINS(IR_CEQ, left2);
 			break;
 		default:
 			die("genexpr: EXPR_BINARY: unhandled binop kind");
 		}
-		PUTINS(IR_EXTRA, right);
+		PUTINS(IR_EXTRA, right2);
 		break;
 	}
 	case EXPR_UNARY: {

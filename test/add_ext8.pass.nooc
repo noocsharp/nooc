@@ -1,0 +1,9 @@
+let main proc() = proc() {
+	let a i8 = 10
+	let b i64 = + 20 a
+	if = b 30 {
+		syscall2(60, 0)
+	} else {
+		syscall2(60, 1)
+	}
+}

@@ -20,6 +20,9 @@ struct instr {
 		// comparison
 		IR_CEQ,
 
+		// extension
+		IR_ZEXT,
+
 		// glue
 		IR_ASSIGN,
 		IR_CALLARG,

@@ -145,7 +145,7 @@ dumpir(struct iproc *instrs)
 			fprintf(stderr, "imm %lu\n", instr->val);
 			break;
 		case IR_ASSIGN:
-			fprintf(stderr, "%%%lu = ", instr->val);
+			fprintf(stderr, "%%%lu %hhu= ", instr->val, instrs->temps.data[instr->val].size);
 			break;
 		case IR_ALLOC:
 			fprintf(stderr, "alloc %lu\n", instr->val);
@@ -161,6 +161,9 @@ dumpir(struct iproc *instrs)
 			break;
 		case IR_CEQ:
 			fprintf(stderr, "ceq %%%lu", instr->val);
+			break;
+		case IR_ZEXT:
+			fprintf(stderr, "zext %%%lu\n", instr->val);
 			break;
 		case IR_EXTRA:
 			fprintf(stderr, ", %%%lu\n", instr->val);
