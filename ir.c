@@ -166,6 +166,8 @@ genexpr(struct iproc *out, size_t expri)
 		break;
 	case EXPR_IDENT: {
 		struct decl *decl = finddecl(expr->d.s);
+		if (decl == NULL)
+			die("genexpr: EXPR_IDENT: decl is null");
 		struct type *type = &types.data[decl->type];
 		if (decl->toplevel) {
 			temp2 = immediate(out, PTRSIZE, decl->w.addr);
@@ -283,6 +285,8 @@ genblock(struct iproc *out, struct block *block)
 	struct assgn *assgn;
 	struct instr ins;
 
+	blockpush(block);
+
 	for (size_t i = 0; i < block->len; i++) {
 		struct item *item = &block->data[i];
 		uint64_t what;
@@ -348,6 +352,7 @@ genblock(struct iproc *out, struct block *block)
 			die("ir_genproc: unreachable");
 		}
 	}
+	blockpop();
 }
 
 static void
@@ -387,8 +392,6 @@ genproc(struct decl *decl, struct proc *proc)
 
 	struct iproc *out = &iproc; // for macros to work, a bit hacky
 
-	blockpush(&proc->block);
-
 	// put a blank interval, since tmpi starts at 1
 	array_add((&iproc.temps), interval);
 	size_t i = 0;
@@ -418,8 +421,6 @@ genproc(struct decl *decl, struct proc *proc)
 	genblock(out, &proc->block);
 	chooseregs(&iproc);
 	array_add((&toplevel.code), iproc);
-
-	blockpop();
 
 	return targ.emitproc(&toplevel.text, out);
 }
