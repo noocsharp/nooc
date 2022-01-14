@@ -343,6 +343,18 @@ mov_r32_r32(struct data *text, enum reg dest, enum reg src)
 }
 
 static size_t
+mov_r16_r16(struct data *text, enum reg dest, enum reg src)
+{
+	return _move_between_reg_and_reg(text, dest, src, 2);
+}
+
+static size_t
+mov_r8_r8(struct data *text, enum reg dest, enum reg src)
+{
+	return _move_between_reg_and_reg(text, dest, src, 1);
+}
+
+static size_t
 _move_between_reg_and_memaddr_in_reg_with_disp(struct data *text, enum reg reg, enum reg mem, int8_t disp, uint8_t opsize, bool dir)
 {
 	assert((reg & 7) != 4 && (mem & 7) != 4);
@@ -415,33 +427,55 @@ mov_disp8_r8_m8(struct data *text, enum reg dest, enum reg src, int8_t disp)
 }
 
 static size_t
-movzx_r8_r64(struct data *text, enum reg dest, enum reg src)
+_movezx_reg_to_reg(struct data *text, uint8_t destsize, uint8_t srcsize, enum reg dest, enum reg src)
 {
+	assert(srcsize == 1 || srcsize == 2);
+	assert(destsize == 1 || destsize == 2 || destsize == 4 || destsize == 8);
 	uint8_t temp;
-	uint8_t rex = REX_W | (dest >= 8 ? REX_R : 0) | (src >= 8 ? REX_B : 0);
+	uint8_t rex = (destsize == 8 ? REX_W : 0) | (dest >= 8 ? REX_R : 0) | (src >= 8 ? REX_B : 0);
 	if (text) {
-		array_addlit(text, rex);
+		if (destsize == 2)
+			array_addlit(text, OP_SIZE_OVERRIDE);
+
+		if (rex)
+			array_addlit(text, rex);
+
 		array_addlit(text, 0x0F);
-		array_addlit(text, 0xB6);
+		array_addlit(text, 0xB6 + (srcsize == 2));
 		array_addlit(text, (MOD_DIRECT << 6) | (dest << 3) | src);
 	}
 
-	return 4;
+	return 3 + !!rex + (destsize == 2);
 }
 
 static size_t
-movzx_r16_r64(struct data *text, enum reg dest, enum reg src)
+movzx_r64_r8(struct data *text, enum reg dest, enum reg src)
 {
-	uint8_t temp;
-	uint8_t rex = REX_W | (dest >= 8 ? REX_R : 0) | (src >= 8 ? REX_B : 0);
-	if (text) {
-		array_addlit(text, rex);
-		array_addlit(text, 0x0F);
-		array_addlit(text, 0xB7);
-		array_addlit(text, (MOD_DIRECT << 6) | (dest << 3) | src);
-	}
+	return _movezx_reg_to_reg(text, 8, 1, dest, src);
+}
 
-	return 4;
+static size_t
+movzx_r32_r8(struct data *text, enum reg dest, enum reg src)
+{
+	return _movezx_reg_to_reg(text, 4, 1, dest, src);
+}
+
+static size_t
+movzx_r16_r8(struct data *text, enum reg dest, enum reg src)
+{
+	return _movezx_reg_to_reg(text, 2, 1, dest, src);
+}
+
+static size_t
+movzx_r64_r16(struct data *text, enum reg dest, enum reg src)
+{
+	return _movezx_reg_to_reg(text, 8, 2, dest, src);
+}
+
+static size_t
+movzx_r32_r16(struct data *text, enum reg dest, enum reg src)
+{
+	return _movezx_reg_to_reg(text, 4, 2, dest, src);
 }
 
 static size_t
@@ -503,16 +537,46 @@ sub_r64_imm(struct data *text, enum reg dest, int32_t imm)
 }
 
 static size_t
-cmp_r64_r64(struct data *text, enum reg reg1, enum reg reg2)
+_cmp_reg_to_reg(struct data *text, uint8_t size, enum reg reg1, enum reg reg2)
 {
 	uint8_t temp;
+	uint8_t rex = (size == 8 ? REX_W : 0) | (reg1 >= 8 ? REX_R : 0) | (reg2 >= 8 ? REX_B : 0);
 	if (text) {
-		array_addlit(text, REX_W);
+		if (size == 2)
+			array_addlit(text, OP_SIZE_OVERRIDE);
+
+		if (rex)
+			array_addlit(text, rex);
+
 		array_addlit(text, 0x3b);
 		array_addlit(text, (MOD_DIRECT << 6) | (reg1 << 3) | reg2);
 	}
 
-	return 3;
+	return 2 + !!rex + (size == 2);
+}
+
+static size_t
+cmp_r64_r64(struct data *text, enum reg reg1, enum reg reg2)
+{
+	return _cmp_reg_to_reg(text, 8, reg1, reg2);
+}
+
+static size_t
+cmp_r32_r32(struct data *text, enum reg reg1, enum reg reg2)
+{
+	return _cmp_reg_to_reg(text, 4, reg1, reg2);
+}
+
+static size_t
+cmp_r16_r16(struct data *text, enum reg reg1, enum reg reg2)
+{
+	return _cmp_reg_to_reg(text, 2, reg1, reg2);
+}
+
+static size_t
+cmp_r8_r8(struct data *text, enum reg reg1, enum reg reg2)
+{
+	return _cmp_reg_to_reg(text, 1, reg1, reg2);
 }
 
 static size_t
@@ -737,9 +801,36 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 
 			switch (ins->op) {
 			case IR_CEQ:
-				total += mov_r64_r64(text, dest, proc->temps.data[ins->val].reg);
+				// FIXME: use SETcc instructions to generalize
+				switch (size) {
+				case 8:
+					total += mov_r64_r64(text, dest, proc->temps.data[ins->val].reg);
+					break;
+				case 4:
+					total += mov_r32_r32(text, dest, proc->temps.data[ins->val].reg);
+					break;
+				case 2:
+					total += mov_r16_r16(text, dest, proc->temps.data[ins->val].reg);
+					break;
+				case 1:
+					total += mov_r8_r8(text, dest, proc->temps.data[ins->val].reg);
+					break;
+				}
 				NEXT;
-				total += cmp_r64_r64(text, dest, proc->temps.data[ins->val].reg);
+				switch (size) {
+				case 8:
+					total += cmp_r64_r64(text, dest, proc->temps.data[ins->val].reg);
+					break;
+				case 4:
+					total += cmp_r32_r32(text, dest, proc->temps.data[ins->val].reg);
+					break;
+				case 2:
+					total += cmp_r16_r16(text, dest, proc->temps.data[ins->val].reg);
+					break;
+				case 1:
+					total += cmp_r8_r8(text, dest, proc->temps.data[ins->val].reg);
+					break;
+				}
 				NEXT;
 				if (ins->op == IR_CONDJUMP) {
 					curi++;
@@ -759,20 +850,43 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 				NEXT;
 				break;
 			case IR_ZEXT:
-				assert(size == 8); // FIXME: should handle all sizes
-				switch (proc->temps.data[ins->val].size) {
-				case 1:
-					total += movzx_r8_r64(text, dest, proc->temps.data[ins->val].reg);
-					break;
-				case 2:
-					total += movzx_r16_r64(text, dest, proc->temps.data[ins->val].reg);
-					break;
-				case 4: // upper 32-bits get cleared automatically in x64
-					total += mov_r32_r32(text, dest, proc->temps.data[ins->val].reg);
-					break;
-				default:
-					die("x64 emitblock: IR_ZEXT, bad size");
-				}
+				if (size == 8) {
+					switch (proc->temps.data[ins->val].size) {
+					case 1:
+						total += movzx_r64_r8(text, dest, proc->temps.data[ins->val].reg);
+						break;
+					case 2:
+						total += movzx_r64_r16(text, dest, proc->temps.data[ins->val].reg);
+						break;
+					case 4: // upper 32-bits get cleared automatically in x64
+						total += mov_r32_r32(text, dest, proc->temps.data[ins->val].reg);
+						break;
+					default:
+						die("x64 emitblock: IR_ZEXT size 8: bad size");
+					}
+				} else if (size == 4) {
+					switch (proc->temps.data[ins->val].size) {
+					case 1:
+						total += movzx_r32_r8(text, dest, proc->temps.data[ins->val].reg);
+						break;
+					case 2:
+						total += movzx_r32_r16(text, dest, proc->temps.data[ins->val].reg);
+						break;
+					case 4: // upper 32-bits get cleared automatically in x64
+						total += mov_r32_r32(text, dest, proc->temps.data[ins->val].reg);
+						break;
+					default:
+						die("x64 emitblock: IR_ZEXT size 4: bad size");
+					}
+				} else if (size == 2) {
+					switch (proc->temps.data[ins->val].size) {
+					case 1:
+						total += movzx_r16_r8(text, dest, proc->temps.data[ins->val].reg);
+						break;
+					default:
+						die("x64 emitblock: IR_ZEXT size 2: bad size");
+					}
+				} else die("x64 emitblock: IR_ZEXT cannot zero extend to 1 byte");
 				NEXT;
 				break;
 			case IR_IMM:

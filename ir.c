@@ -200,10 +200,10 @@ genexpr(struct iproc *out, size_t expri)
 			right2 = assign(out, out->temps.data[left].size);
 			PUTINS(IR_ZEXT, right);
 		} else right2 = right;
-		temp1 = assign(out, PTRSIZE);
+		temp1 = assign(out, out->temps.data[left2].size);
 		switch (expr->d.bop.kind) {
 		case BOP_PLUS:
-			PUTINS(IR_ADD, left2); // FIXME: operand size?
+			PUTINS(IR_ADD, left2);
 			break;
 		case BOP_EQUAL:
 			PUTINS(IR_CEQ, left2);
