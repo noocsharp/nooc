@@ -182,22 +182,22 @@ store(struct iproc *out, uint8_t size, uint64_t src, uint64_t dest)
 	putins(out, IR_EXTRA, dest, VT_TEMP);
 }
 
-static uint64_t
-genexpr(struct iproc *out, size_t expri)
+static int
+genexpr(struct iproc *out, size_t expri, uint64_t *val)
 {
 	struct expr *expr = &exprs.data[expri];
-	uint64_t temp1 = 0, temp2 = 0;
+	uint64_t temp2 = 0;
 	switch (expr->kind) {
 	case EXPR_LIT:
 		switch (expr->class) {
 		case C_INT:
 			// FIXME: size should not be hardcoded
-			temp1 = immediate(out, 8, expr->d.v.v.i64);
+			*val = immediate(out, 8, expr->d.v.v.i64);
 			break;
 		default:
 			die("genexpr: EXPR_LIT: unhandled class");
 		}
-		break;
+		return VT_TEMP;
 	case EXPR_IDENT: {
 		struct decl *decl = finddecl(expr->d.s);
 		if (decl == NULL)
@@ -211,21 +211,25 @@ genexpr(struct iproc *out, size_t expri)
 			case 2:
 			case 4:
 			case 8:
-				temp1 = load(out, type->size, temp2);
+				*val = load(out, type->size, temp2);
 				break;
 			default:
 				die("genexpr: unknown size");
 			}
 		} else if (decl->in) {
-			temp1 = decl->index;
+			*val = decl->index;
 		} else {
-			temp1 = load(out, type->size, decl->index);
+			*val = load(out, type->size, decl->index);
 		}
-		break;
+		return VT_TEMP;
 	}
 	case EXPR_BINARY: {
-		uint64_t left = genexpr(out, expr->d.bop.left), left2;
-		uint64_t right = genexpr(out, expr->d.bop.right), right2;
+		uint64_t left, left2;
+		int lefttype = genexpr(out, expr->d.bop.left, &left);
+		assert(lefttype == VT_TEMP);
+		uint64_t right, right2;
+		int righttype = genexpr(out, expr->d.bop.right, &right);
+		assert(righttype == VT_TEMP);
 		if (out->temps.data[left].size < out->temps.data[right].size) {
 			left2 = assign(out, out->temps.data[right].size);
 			putins(out, IR_ZEXT, left, VT_TEMP);
@@ -234,7 +238,7 @@ genexpr(struct iproc *out, size_t expri)
 			right2 = assign(out, out->temps.data[left].size);
 			putins(out, IR_ZEXT, right, VT_TEMP);
 		} else right2 = right;
-		temp1 = assign(out, out->temps.data[left2].size);
+		*val = assign(out, out->temps.data[left2].size);
 		switch (expr->d.bop.kind) {
 		case BOP_PLUS:
 			putins(out, IR_ADD, left2, VT_TEMP);
@@ -246,7 +250,7 @@ genexpr(struct iproc *out, size_t expri)
 			die("genexpr: EXPR_BINARY: unhandled binop kind");
 		}
 		putins(out, IR_EXTRA, right2, VT_TEMP);
-		break;
+		return VT_TEMP;
 	}
 	case EXPR_UNARY: {
 		switch (expr->d.uop.kind) {
@@ -256,46 +260,50 @@ genexpr(struct iproc *out, size_t expri)
 			struct decl *decl = finddecl(operand->d.s);
 			// a global
 			if (decl->toplevel) {
-				temp1 = immediate(out, PTRSIZE, decl->w.addr);
+				*val = immediate(out, PTRSIZE, decl->w.addr);
 			} else {
-				temp1 = decl->index;
+				*val = decl->index;
 			}
 			break;
 		}
 		default:
 			die("genexpr: EXPR_UNARY: unhandled unop kind");
 		}
-		break;
+		return VT_TEMP;
 	}
 	case EXPR_FCALL: {
-		temp1 = 1; // value doesn't matter
 		uint64_t proc = procindex(&expr->d.call.name);
-		size_t params[20];
+		struct {
+			uint64_t val;
+			int valtype;
+		} params[20];
 		assert(expr->d.call.params.len < 20);
 		for (size_t i = 0; i < expr->d.call.params.len; i++) {
-			params[i] = genexpr(out, expr->d.call.params.data[i]);
+			params[i].valtype = genexpr(out, expr->d.call.params.data[i], &params[i].val);
+			assert(params[i].valtype == VT_TEMP);
 		}
 		if (!out_index) {
 			// allocate memory even if we don't need to store the return value
 			// FIXME: don't hardcode sizes
 			out_index = alloc(out, 8, 1);
 		}
-		params[expr->d.call.params.len] = out_index;
+		params[expr->d.call.params.len].val = out_index;
+		params[expr->d.call.params.len].valtype = VT_TEMP;
 		STARTINS(IR_CALL, proc, VT_FUNC);
 		for (size_t i = expr->d.call.params.len; i <= expr->d.call.params.len; i--) {
-			putins(out, IR_CALLARG, params[i], VT_TEMP);
+			putins(out, IR_CALLARG, params[i].val, params[i].valtype);
 		}
 
 		out_index = 0;
-		break;
+		return VT_EMPTY;
 	}
 	case EXPR_COND: {
-		temp1 = 1; // this doesn't matter until we add ternary-like usage
-		size_t condtmp = genexpr(out, expr->d.cond.cond);
+		uint64_t condtmp;
+		int valtype = genexpr(out, expr->d.cond.cond, &condtmp);
 		size_t elselabel = labeli++;
 		size_t endlabel = labeli++;
 		STARTINS(IR_CONDJUMP, elselabel, VT_LABEL);
-		putins(out, IR_EXTRA, condtmp, VT_TEMP);
+		putins(out, IR_EXTRA, condtmp, valtype);
 		genblock(out, &expr->d.cond.bif);
 		STARTINS(IR_JUMP, endlabel, VT_LABEL);
 		if (expr->d.cond.belse.len) {
@@ -303,14 +311,13 @@ genexpr(struct iproc *out, size_t expri)
 			genblock(out, &expr->d.cond.belse);
 			putins(out, IR_LABEL, endlabel, VT_LABEL);
 		}
-		break;
+		return VT_EMPTY;
 	}
 	default:
 		die("genexpr: expr kind");
 	}
 
-	assert(temp1);
-	return temp1;
+	assert(0);
 }
 
 static void
@@ -319,6 +326,7 @@ genblock(struct iproc *out, struct block *block)
 	struct decl *decl;
 	struct type *type;
 	struct assgn *assgn;
+	int valtype;
 
 	blockpush(block);
 
@@ -341,14 +349,17 @@ genblock(struct iproc *out, struct block *block)
 			}
 			if (exprs.data[decl->val].kind == EXPR_FCALL) {
 				out_index = decl->index;
-				what = genexpr(out, decl->val);
+				// return val doesn't matter
+				genexpr(out, decl->val, &what);
 			} else {
-				what = genexpr(out, decl->val);
+				valtype = genexpr(out, decl->val, &what);
+				assert(valtype == VT_TEMP);
 				switch (type->size) {
 				case 1:
 				case 2:
 				case 4:
 				case 8:
+					// FIXME: use valtype here
 					store(out, type->size, what, decl->index);
 					break;
 				default:
@@ -362,9 +373,10 @@ genblock(struct iproc *out, struct block *block)
 			type = &types.data[decl->type];
 			if (exprs.data[assgn->val].kind == EXPR_FCALL) {
 				out_index = decl->index;
-				what = genexpr(out, assgn->val);
+				genexpr(out, assgn->val, &what);
 			} else {
-				what = genexpr(out, assgn->val);
+				valtype = genexpr(out, assgn->val, &what);
+				assert(valtype == VT_TEMP);
 				switch (type->size) {
 				case 1:
 				case 2:
@@ -378,7 +390,7 @@ genblock(struct iproc *out, struct block *block)
 			}
 			break;
 		case ITEM_EXPR:
-			genexpr(out, item->idx);
+			genexpr(out, item->idx, &what);
 			break;
 		case ITEM_RETURN:
 			STARTINS(IR_RETURN, 0, VT_EMPTY);
