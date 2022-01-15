@@ -126,10 +126,31 @@ dumpexpr(int indent, struct expr *expr)
 	}
 }
 
+static char
+sigil(int valtype)
+{
+	switch (valtype) {
+	case VT_EMPTY:
+		return '!';
+	case VT_TEMP:
+		return '%';
+	case VT_IMM:
+		return ' ';
+	case VT_FUNC:
+		return '$';
+	case VT_LABEL:
+		return ':';
+	}
+
+	die("sigil: unknown valtype");
+	return 0; // suppress dumb error
+}
+
 void
 dumpir(struct iproc *instrs)
 {
 	bool callarg = false;
+	char sig;
 	for (int i = 0; i < instrs->len; i++) {
 		struct instr *instr = &instrs->data[i];
 		if (callarg && instr->op != IR_CALLARG) {
@@ -137,58 +158,58 @@ dumpir(struct iproc *instrs)
 			callarg = false;
 		}
 
+		sig = sigil(instr->valtype);
 		switch (instr->op) {
-		case IR_IN:
-			fprintf(stderr, "in %lu\n", instr->val);
-			break;
-		case IR_IMM:
-			fprintf(stderr, "imm %lu\n", instr->val);
-			break;
 		case IR_ASSIGN:
 			fprintf(stderr, "%%%lu %hhu= ", instr->val, instrs->temps.data[instr->val].size);
 			break;
+		case IR_IN:
+			fprintf(stderr, "in %c%lu\n", sig, instr->val);
+			break;
+		case IR_IMM:
+			fprintf(stderr, "imm %c%lu\n", sig, instr->val);
+			break;
 		case IR_ALLOC:
-			fprintf(stderr, "alloc %lu\n", instr->val);
+			fprintf(stderr, "alloc %c%lu\n", sig, instr->val);
 			break;
 		case IR_STORE:
-			fprintf(stderr, "store %%%lu", instr->val);
+			fprintf(stderr, "store %c%lu", sig, instr->val);
 			break;
 		case IR_LOAD:
-			fprintf(stderr, "load %%%lu\n", instr->val);
+			fprintf(stderr, "load %c%lu\n", sig, instr->val);
 			break;
 		case IR_ADD:
-			fprintf(stderr, "add %%%lu", instr->val);
+			fprintf(stderr, "add %c%lu", sig, instr->val);
 			break;
 		case IR_CEQ:
-			fprintf(stderr, "ceq %%%lu", instr->val);
+			fprintf(stderr, "ceq %c%lu", sig, instr->val);
 			break;
 		case IR_ZEXT:
-			fprintf(stderr, "zext %%%lu\n", instr->val);
+			fprintf(stderr, "zext %c%lu\n", sig, instr->val);
 			break;
 		case IR_EXTRA:
-			fprintf(stderr, ", %%%lu\n", instr->val);
+			fprintf(stderr, ", %c%lu\n", sig, instr->val);
 			break;
 		case IR_CALLARG:
-			fprintf(stderr, ", %%%lu", instr->val);
+			fprintf(stderr, ", %c%lu", sig, instr->val);
 			break;
 		case IR_CALL:
 			callarg = true;
-			fprintf(stderr, "call $%lu", instr->val);
+			fprintf(stderr, "call %c%lu", sig, instr->val);
 			break;
 		case IR_RETURN:
 			fputs("return\n", stderr);
 			break;
 		case IR_CONDJUMP:
-			fprintf(stderr, "condjump :%lu", instr->val);
+			fprintf(stderr, "condjump %c%lu", sig, instr->val);
 			break;
 		case IR_JUMP:
-			fprintf(stderr, "jump :%lu\n", instr->val);
+			fprintf(stderr, "jump %c%lu\n", sig, instr->val);
 			break;
 		case IR_LABEL:
-			fprintf(stderr, "label :%lu\n", instr->val);
+			fprintf(stderr, "label %c%lu\n", sig, instr->val);
 			break;
 		default:
-			fprintf(stderr, "%d\n", instr->op);
 			die("dumpir: unknown instruction");
 		}
 	}
