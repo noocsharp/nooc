@@ -18,7 +18,7 @@ extern struct exprs exprs;
 extern struct assgns assgns;
 extern struct toplevel toplevel;
 
-#define STARTINS(op, val) putins((out), (op), (val)) ; curi++ ;
+#define STARTINS(op, val, valtype) putins((out), (op), (val), (valtype)) ; curi++ ;
 #define NEWTMP tmpi++; interval.start = curi + 1; interval.end = curi + 1; array_add((&out->temps), interval);
 
 #define PTRSIZE 8
@@ -70,44 +70,74 @@ procindex(struct slice *s)
 	return 0;
 }
 
-// some ops don't take temporaries, so only bump on ops that take temporaries
-void
-bumpinterval(struct iproc *out, struct instr *instr, size_t index) {
-	switch (instr->op) {
-	case IR_NONE:
-	case IR_IMM:
-	case IR_CALL:
-	case IR_RETURN:
-	case IR_LABEL:
-	case IR_CONDJUMP:
-	case IR_JUMP:
-	case IR_ALLOC:
-		break;
-	case IR_STORE:
-	case IR_LOAD:
-	case IR_ADD:
-	case IR_CEQ:
-	case IR_ZEXT:
-	case IR_ASSIGN:
-	case IR_CALLARG:
-	case IR_IN:
-	case IR_EXTRA:
-		out->temps.data[index].end = curi;
-		break;
-	default:
-		die("bumpinterval");
-	}
-}
-
 static void
-putins(struct iproc *out, int op, uint64_t val)
+putins(struct iproc *out, int op, uint64_t val, int valtype)
 {
+	assert(op);
+	assert(valtype);
 	struct instr ins = {
 		.val = val,
 		.op = op,
+		.valtype = valtype
 	};
 
-	bumpinterval(out, &ins, val);
+	switch (valtype) {
+	case VT_TEMP:
+		switch (op) {
+		case IR_STORE:
+		case IR_LOAD:
+		case IR_ADD:
+		case IR_CEQ:
+		case IR_ZEXT:
+		case IR_ASSIGN:
+		case IR_CALLARG:
+		case IR_EXTRA:
+			break;
+		default:
+			die("putins: bad op for VT_TEMP");
+		}
+		out->temps.data[val].end = curi;
+		break;
+	case VT_LABEL:
+		switch (op) {
+		case IR_LABEL:
+		case IR_JUMP:
+		case IR_CONDJUMP:
+			break;
+		default:
+			die("putins: bad op for VT_LABEL");
+		}
+		break;
+	case VT_FUNC:
+		switch (op) {
+		case IR_CALL:
+			break;
+		default:
+			die("putins: bad op for VT_FUNC");
+		}
+		break;
+	case VT_IMM:
+		switch (op) {
+		case IR_IN:
+		case IR_IMM:
+		case IR_ALLOC:
+			break;
+		default:
+			die("putins: bad op for VT_IMM");
+		}
+		break;
+	case VT_EMPTY:
+		switch (op) {
+		case IR_RETURN:
+			break;
+		default:
+			die("putins: bad op for VT_EMPTY");
+		}
+		break;
+	default:
+		die("putins: unknown valtype");
+	}
+
 	array_add(out, ins);
 }
 
@@ -115,7 +145,7 @@ static size_t
 assign(struct iproc *out, uint8_t size)
 {
 	size_t t = NEWTMP;
-	STARTINS(IR_ASSIGN, t);
+	STARTINS(IR_ASSIGN, t, VT_TEMP);
 	out->temps.data[t].size = size;
 	return t;
 }
@@ -123,39 +153,33 @@ assign(struct iproc *out, uint8_t size)
 static size_t
 immediate(struct iproc *out, uint8_t size, uint64_t val)
 {
-	size_t t = NEWTMP;
-	STARTINS(IR_ASSIGN, t);
-	out->temps.data[t].size = size;
-	putins(out, IR_IMM, val);
+	size_t t = assign(out, size);
+	putins(out, IR_IMM, val, VT_IMM);
 	return t;
 }
 
 static size_t
 load(struct iproc *out, uint8_t size, uint64_t index)
 {
-	size_t t = NEWTMP;
-	STARTINS(IR_ASSIGN, t);
-	out->temps.data[t].size = size;
-	putins(out, IR_LOAD, index);
+	size_t t = assign(out, size);;
+	putins(out, IR_LOAD, index, VT_TEMP);
 	return t;
 }
 
 static size_t
 alloc(struct iproc *out, uint8_t size, uint64_t count)
 {
-	size_t t = NEWTMP;
-	STARTINS(IR_ASSIGN, t);
-	out->temps.data[t].size = size;
+	size_t t = assign(out, size);
 	out->temps.data[t].flags = TF_PTR;
-	putins(out, IR_ALLOC, count);
+	putins(out, IR_ALLOC, count, VT_IMM);
 	return t;
 }
 
 static void
 store(struct iproc *out, uint8_t size, uint64_t src, uint64_t dest)
 {
-	STARTINS(IR_STORE, src);
-	putins(out, IR_EXTRA, dest);
+	STARTINS(IR_STORE, src, VT_TEMP);
+	putins(out, IR_EXTRA, dest, VT_TEMP);
 }
 
 static uint64_t
@@ -204,24 +228,24 @@ genexpr(struct iproc *out, size_t expri)
 		uint64_t right = genexpr(out, expr->d.bop.right), right2;
 		if (out->temps.data[left].size < out->temps.data[right].size) {
 			left2 = assign(out, out->temps.data[right].size);
-			putins(out, IR_ZEXT, left);
+			putins(out, IR_ZEXT, left, VT_TEMP);
 		} else left2 = left;
 		if (out->temps.data[left].size > out->temps.data[right].size) {
 			right2 = assign(out, out->temps.data[left].size);
-			putins(out, IR_ZEXT, right);
+			putins(out, IR_ZEXT, right, VT_TEMP);
 		} else right2 = right;
 		temp1 = assign(out, out->temps.data[left2].size);
 		switch (expr->d.bop.kind) {
 		case BOP_PLUS:
-			putins(out, IR_ADD, left2);
+			putins(out, IR_ADD, left2, VT_TEMP);
 			break;
 		case BOP_EQUAL:
-			putins(out, IR_CEQ, left2);
+			putins(out, IR_CEQ, left2, VT_TEMP);
 			break;
 		default:
 			die("genexpr: EXPR_BINARY: unhandled binop kind");
 		}
-		putins(out, IR_EXTRA, right2);
+		putins(out, IR_EXTRA, right2, VT_TEMP);
 		break;
 	}
 	case EXPR_UNARY: {
@@ -257,9 +281,9 @@ genexpr(struct iproc *out, size_t expri)
 			out_index = alloc(out, 8, 1);
 		}
 		params[expr->d.call.params.len] = out_index;
-		STARTINS(IR_CALL, proc);
+		STARTINS(IR_CALL, proc, VT_FUNC);
 		for (size_t i = expr->d.call.params.len; i <= expr->d.call.params.len; i--) {
-			putins(out, IR_CALLARG, params[i]);
+			putins(out, IR_CALLARG, params[i], VT_TEMP);
 		}
 
 		out_index = 0;
@@ -270,13 +294,15 @@ genexpr(struct iproc *out, size_t expri)
 		size_t condtmp = genexpr(out, expr->d.cond.cond);
 		size_t elselabel = labeli++;
 		size_t endlabel = labeli++;
-		STARTINS(IR_CONDJUMP, elselabel);
-		putins(out, IR_EXTRA, condtmp);
+		STARTINS(IR_CONDJUMP, elselabel, VT_LABEL);
+		putins(out, IR_EXTRA, condtmp, VT_TEMP);
 		genblock(out, &expr->d.cond.bif);
-		STARTINS(IR_JUMP, endlabel);
-		putins(out, IR_LABEL, elselabel);
-		genblock(out, &expr->d.cond.belse);
-		putins(out, IR_LABEL, endlabel);
+		STARTINS(IR_JUMP, endlabel, VT_LABEL);
+		if (expr->d.cond.belse.len) {
+			putins(out, IR_LABEL, elselabel, VT_LABEL);
+			genblock(out, &expr->d.cond.belse);
+			putins(out, IR_LABEL, endlabel, VT_LABEL);
+		}
 		break;
 	}
 	default:
@@ -355,7 +381,7 @@ genblock(struct iproc *out, struct block *block)
 			genexpr(out, item->idx);
 			break;
 		case ITEM_RETURN:
-			STARTINS(IR_RETURN, 0);
+			STARTINS(IR_RETURN, 0, VT_EMPTY);
 			break;
 		default:
 			die("ir_genproc: unreachable");
@@ -409,10 +435,10 @@ genproc(struct decl *decl, struct proc *proc)
 		type = &types.data[proc->in.data[j].type];
 		size_t what = NEWTMP;
 		decl->index = what;
-		STARTINS(IR_ASSIGN, what);
+		STARTINS(IR_ASSIGN, what, VT_TEMP);
 		iproc.temps.data[what].flags = TF_INT; // FIXME: move this to a separate function?
 		iproc.temps.data[what].size = type->size; // FIXME: should we check that it's a power of 2?
-		putins(out, IR_IN, i);
+		putins(out, IR_IN, i, VT_IMM);
 	}
 
 	for (size_t j = 0; j < proc->out.len; j++, i++) {
@@ -420,10 +446,10 @@ genproc(struct decl *decl, struct proc *proc)
 		type = &types.data[proc->out.data[j].type];
 		size_t what = NEWTMP;
 		decl->index = what;
-		STARTINS(IR_ASSIGN, what);
+		STARTINS(IR_ASSIGN, what, VT_TEMP);
 		iproc.temps.data[what].flags = TF_PTR; // FIXME: move this to a separate function?
 		iproc.temps.data[what].size = type->size; // FIXME: should we check that it's a power of 2?
-		putins(out, IR_IN, i);
+		putins(out, IR_IN, i, VT_IMM);
 	}
 
 	genblock(out, &proc->block);

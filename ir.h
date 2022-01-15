@@ -29,6 +29,13 @@ struct instr {
 		IR_IN,
 		IR_EXTRA,
 	} op;
+	enum {
+		VT_EMPTY = 1,
+		VT_TEMP,
+		VT_IMM,
+		VT_FUNC,
+		VT_LABEL,
+	} valtype;
 };
 
 struct temp {

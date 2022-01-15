@@ -777,16 +777,19 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 		switch (ins->op) {
 		// FIXME: we don't handle jumps backward yet
 		case IR_JUMP:
+			assert(ins->valtype == VT_LABEL);
 			total += jmp(text, emitblock(NULL, proc, ins + 1, end, ins->val));
 			NEXT;
 			break;
 		case IR_RETURN:
+			assert(ins->valtype == VT_EMPTY);
 			total += add_r64_imm(text, RSP, localalloc);
 			total += pop_r64(text, RBP);
 			total += ret(text);
 			NEXT;
 			break;
 		case IR_STORE:
+			assert(ins->valtype == VT_TEMP);
 			src = proc->temps.data[ins->val].reg;
 			NEXT;
 			assert(ins->op == IR_EXTRA);
@@ -794,6 +797,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 			NEXT;
 			break;
 		case IR_ASSIGN:
+			assert(ins->valtype == VT_TEMP);
 			tmp = ins->val;
 			dest = proc->temps.data[ins->val].reg;
 			size = proc->temps.data[ins->val].size;
@@ -833,6 +837,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 				}
 				NEXT;
 				if (ins->op == IR_CONDJUMP) {
+					assert(ins->valtype == VT_LABEL);
 					curi++;
 					label = ins->val;
 					NEXT;
@@ -844,12 +849,14 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 				}
 				break;
 			case IR_ADD:
+				assert(ins->valtype == VT_TEMP);
 				total += mov_r64_r64(text, dest, proc->temps.data[ins->val].reg);
 				NEXT;
 				total += add_r64_r64(text, dest, proc->temps.data[ins->val].reg);
 				NEXT;
 				break;
 			case IR_ZEXT:
+				assert(ins->valtype == VT_TEMP);
 				if (size == 8) {
 					switch (proc->temps.data[ins->val].size) {
 					case 1:
@@ -890,6 +897,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 				NEXT;
 				break;
 			case IR_IMM:
+				assert(ins->valtype == VT_IMM);
 				total += mov_r64_imm(text, dest, ins->val);
 				NEXT;
 				break;
@@ -898,6 +906,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 				NEXT;
 				break;
 			case IR_LOAD:
+				assert(ins->valtype == VT_TEMP);
 				switch (size) {
 				case 8:
 					total += mov_r64_mr64(text, dest, proc->temps.data[ins->val].reg);
@@ -917,6 +926,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 				NEXT;
 				break;
 			case IR_ALLOC:
+				assert(ins->valtype == VT_IMM);
 				total += mov_r64_r64(text, dest, RSP);
 				total += sub_r64_imm(text, RSP, 8); // FIXME: hardcoding
 				localalloc += 8;
@@ -927,6 +937,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 			}
 			break;
 		case IR_CALL:
+			assert(ins->valtype == VT_FUNC);
 			count = 0;
 			dest = ins->val;
 
@@ -955,6 +966,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 			}
 			break;
 		case IR_LABEL:
+			assert(ins->valtype == VT_LABEL);
 			if (ins->val == end_label)
 				goto done;
 
