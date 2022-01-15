@@ -333,6 +333,7 @@ genblock(struct iproc *out, struct block *block)
 	for (size_t i = 0; i < block->len; i++) {
 		struct item *item = &block->data[i];
 		uint64_t what;
+		size_t val;
 		switch (item->kind) {
 		case ITEM_DECL:
 			decl = &block->decls.data[item->idx];
@@ -347,35 +348,19 @@ genblock(struct iproc *out, struct block *block)
 			default:
 				die("ir_genproc: unknown size");
 			}
-			if (exprs.data[decl->val].kind == EXPR_FCALL) {
-				out_index = decl->index;
-				// return val doesn't matter
-				genexpr(out, decl->val, &what);
-			} else {
-				valtype = genexpr(out, decl->val, &what);
-				assert(valtype == VT_TEMP);
-				switch (type->size) {
-				case 1:
-				case 2:
-				case 4:
-				case 8:
-					// FIXME: use valtype here
-					store(out, type->size, what, decl->index);
-					break;
-				default:
-					die("ir_genproc: unknown size");
-				}
-			}
-			break;
+			val = decl->val;
+			goto decl_assign_common;
 		case ITEM_ASSGN:
 			assgn = &assgns.data[item->idx];
 			decl = finddecl(assgn->s);
 			type = &types.data[decl->type];
-			if (exprs.data[assgn->val].kind == EXPR_FCALL) {
+			val = assgn->val;
+decl_assign_common:
+			if (exprs.data[val].kind == EXPR_FCALL) {
 				out_index = decl->index;
-				genexpr(out, assgn->val, &what);
+				genexpr(out, val, &what);
 			} else {
-				valtype = genexpr(out, assgn->val, &what);
+				valtype = genexpr(out, val, &what);
 				assert(valtype == VT_TEMP);
 				switch (type->size) {
 				case 1:
