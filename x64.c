@@ -748,16 +748,14 @@ emitsyscall(struct data *text, uint8_t paramcount)
 }
 
 size_t
-emitblock(struct data *text, struct iproc *proc, struct instr *start, struct instr *end, uint64_t end_label)
+emitblock(struct data *text, struct iproc *proc, struct instr *start, struct instr *end, uint64_t end_label, uint16_t active, uint16_t curi)
 {
 	struct instr *ins = start ? start : proc->data;
 	end = end ? end : &proc->data[proc->len];
 
-	uint16_t active = 0;
-
 	uint64_t dest, src, size, count, tmp, label;
 	int64_t offset;
-	uint64_t localalloc = 0, curi = 0;
+	uint64_t localalloc = 0;
 
 	size_t total = 0;
 	if (!start) {
@@ -778,7 +776,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 		// FIXME: we don't handle jumps backward yet
 		case IR_JUMP:
 			assert(ins->valtype == VT_LABEL);
-			total += jmp(text, emitblock(NULL, proc, ins + 1, end, ins->val));
+			total += jmp(text, emitblock(NULL, proc, ins + 1, end, ins->val, active, curi));
 			NEXT;
 			break;
 		case IR_RETURN:
@@ -843,7 +841,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 					NEXT;
 					assert(ins->op == IR_EXTRA);
 					if (ins->val == tmp) {
-						total += jne(text, emitblock(NULL, proc, ins + 1, end, label));
+						total += jne(text, emitblock(NULL, proc, ins + 1, end, label, active, curi));
 					}
 					NEXT;
 				}
@@ -987,5 +985,5 @@ done:
 size_t
 emitproc(struct data *text, struct iproc *proc)
 {
-	return emitblock(text, proc, NULL, NULL, 0);
+	return emitblock(text, proc, NULL, NULL, 0, 0, 0);
 }
