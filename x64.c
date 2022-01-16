@@ -580,6 +580,21 @@ cmp_r8_r8(struct data *text, enum reg reg1, enum reg reg2)
 }
 
 static size_t
+cmp_r8_imm(struct data *text, enum reg reg, uint8_t imm)
+{
+	uint8_t temp;
+	if (text) {
+		if (reg >= 8)
+			array_addlit(text, REX_B);
+		array_addlit(text, 0x80);
+		array_addlit(text, (MOD_DIRECT << 6) | (7 << 3) | (reg & 7));
+		array_addlit(text, imm);
+	}
+
+	return 3 + !(reg < 8);
+}
+
+static size_t
 jng(struct data *text, int64_t offset)
 {
 	uint8_t temp;
@@ -627,10 +642,42 @@ jne(struct data *text, int64_t offset)
 		}
 		return 2;
 	} else {
-		die("unimplemented jng offet!");
+		die("unimplemented jne offet!");
 	}
 
 	return 0; // prevents warning
+}
+
+static size_t
+je(struct data *text, int64_t offset)
+{
+	uint8_t temp;
+	if (-256 <= offset && offset <= 255) {
+		int8_t i = offset;
+		if (text) {
+			array_addlit(text, 0x74);
+			array_addlit(text, i);
+		}
+		return 2;
+	} else {
+		die("unimplemented je offet!");
+	}
+
+	return 0; // prevents warning
+}
+
+static size_t
+sete_reg(struct data *text, enum reg reg)
+{
+	uint8_t temp;
+	if (text) {
+		if (reg >= 8) array_addlit(text, REX_B);
+		array_addlit(text, 0x0F);
+		array_addlit(text, 0x94);
+		array_addlit(text, (MOD_DIRECT << 6) | (reg & 7));
+	}
+
+	return 3 + !(reg < 8);
 }
 
 static size_t
@@ -779,6 +826,17 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 			total += jmp(text, emitblock(NULL, proc, ins + 1, end, ins->val, active, curi));
 			NEXT;
 			break;
+		case IR_CONDJUMP:
+			assert(ins->valtype == VT_LABEL);
+			curi++;
+			label = ins->val;
+			NEXT;
+			assert(ins->op == IR_EXTRA);
+			assert(ins->valtype == VT_TEMP);
+			total += cmp_r8_imm(text, proc->temps.data[ins->val].reg, 0);
+			total += je(text, emitblock(NULL, proc, ins + 1, end, label, active, curi));
+			NEXT;
+			break;
 		case IR_RETURN:
 			assert(ins->valtype == VT_EMPTY);
 			total += add_r64_imm(text, RSP, localalloc);
@@ -803,48 +861,24 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 
 			switch (ins->op) {
 			case IR_CEQ:
-				// FIXME: use SETcc instructions to generalize
-				switch (size) {
-				case 8:
-					total += mov_r64_r64(text, dest, proc->temps.data[ins->val].reg);
-					break;
-				case 4:
-					total += mov_r32_r32(text, dest, proc->temps.data[ins->val].reg);
-					break;
-				case 2:
-					total += mov_r16_r16(text, dest, proc->temps.data[ins->val].reg);
-					break;
-				case 1:
-					total += mov_r8_r8(text, dest, proc->temps.data[ins->val].reg);
-					break;
-				}
+				src = proc->temps.data[ins->val].reg;
 				NEXT;
 				switch (size) {
 				case 8:
-					total += cmp_r64_r64(text, dest, proc->temps.data[ins->val].reg);
+					total += cmp_r64_r64(text, src, proc->temps.data[ins->val].reg);
 					break;
 				case 4:
-					total += cmp_r32_r32(text, dest, proc->temps.data[ins->val].reg);
+					total += cmp_r32_r32(text, src, proc->temps.data[ins->val].reg);
 					break;
 				case 2:
-					total += cmp_r16_r16(text, dest, proc->temps.data[ins->val].reg);
+					total += cmp_r16_r16(text, src, proc->temps.data[ins->val].reg);
 					break;
 				case 1:
-					total += cmp_r8_r8(text, dest, proc->temps.data[ins->val].reg);
+					total += cmp_r8_r8(text, src, proc->temps.data[ins->val].reg);
 					break;
 				}
+				total += sete_reg(text, dest);
 				NEXT;
-				if (ins->op == IR_CONDJUMP) {
-					assert(ins->valtype == VT_LABEL);
-					curi++;
-					label = ins->val;
-					NEXT;
-					assert(ins->op == IR_EXTRA);
-					if (ins->val == tmp) {
-						total += jne(text, emitblock(NULL, proc, ins + 1, end, label, active, curi));
-					}
-					NEXT;
-				}
 				break;
 			case IR_ADD:
 				assert(ins->valtype == VT_TEMP);
