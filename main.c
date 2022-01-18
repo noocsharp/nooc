@@ -128,7 +128,7 @@ gentoplevel(struct toplevel *toplevel, struct block *block)
 				if (slice_cmplit(&decl->s, "main") == 0) {
 					toplevel->entry = curaddr;
 				}
-				assert(expr->kind = EXPR_PROC);
+				assert(expr->kind == EXPR_PROC);
 				blockpush(&expr->d.proc.block);
 				typecheck(&expr->d.proc.block);
 				decl->w.addr = curaddr;
