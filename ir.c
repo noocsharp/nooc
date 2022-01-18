@@ -321,19 +321,41 @@ genexpr(struct iproc *out, size_t expri, uint64_t *val)
 }
 
 static void
+genassign(struct iproc *out, struct decl *decl, size_t val)
+{
+	struct type *type = &types.data[decl->type];
+	uint64_t what;
+	if (exprs.data[val].kind == EXPR_FCALL) {
+		out_index = decl->index;
+		genexpr(out, val, &what);
+	} else {
+		int valtype = genexpr(out, val, &what);
+		assert(valtype == VT_TEMP);
+		switch (type->size) {
+		case 1:
+		case 2:
+		case 4:
+		case 8:
+			store(out, type->size, what, decl->index);
+			break;
+		default:
+			die("ir_genproc: unknown size");
+		}
+	}
+}
+
+static void
 genblock(struct iproc *out, struct block *block)
 {
 	struct decl *decl;
 	struct type *type;
 	struct assgn *assgn;
-	int valtype;
 
 	blockpush(block);
 
 	for (size_t i = 0; i < block->len; i++) {
 		struct statement *statement = &block->data[i];
 		uint64_t what;
-		size_t val;
 		switch (statement->kind) {
 		case STMT_DECL:
 			decl = &block->decls.data[statement->idx];
@@ -348,31 +370,12 @@ genblock(struct iproc *out, struct block *block)
 			default:
 				die("ir_genproc: unknown size");
 			}
-			val = decl->val;
-			goto decl_assign_common;
+			genassign(out, decl, decl->val);
+			break;
 		case STMT_ASSGN:
 			assgn = &assgns.data[statement->idx];
 			decl = finddecl(assgn->s);
-			type = &types.data[decl->type];
-			val = assgn->val;
-decl_assign_common:
-			if (exprs.data[val].kind == EXPR_FCALL) {
-				out_index = decl->index;
-				genexpr(out, val, &what);
-			} else {
-				valtype = genexpr(out, val, &what);
-				assert(valtype == VT_TEMP);
-				switch (type->size) {
-				case 1:
-				case 2:
-				case 4:
-				case 8:
-					store(out, type->size, what, decl->index);
-					break;
-				default:
-					die("ir_genproc: unknown size");
-				}
-			}
+			genassign(out, decl, assgn->val);
 			break;
 		case STMT_EXPR:
 			genexpr(out, statement->idx, &what);
