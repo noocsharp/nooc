@@ -800,9 +800,9 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 	struct instr *ins = start ? start : proc->data;
 	end = end ? end : &proc->data[proc->len];
 
-	uint64_t dest, src, size, count, tmp, label;
+	uint64_t dest, src, size, count, label;
 	int64_t offset;
-	uint64_t localalloc = 0;
+	uint64_t localalloc = 0, curlabel = 0;
 
 	size_t total = 0;
 	if (!start) {
@@ -823,7 +823,8 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 		// FIXME: we don't handle jumps backward yet
 		case IR_JUMP:
 			assert(ins->valtype == VT_LABEL);
-			total += jmp(text, emitblock(NULL, proc, ins + 1, end, ins->val, active, curi));
+			label = ins->val;
+			total += jmp(text, emitblock(NULL, proc, ins + 1, end, label, active, curi));
 			NEXT;
 			break;
 		case IR_CONDJUMP:
@@ -849,20 +850,23 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 			src = proc->temps.data[ins->val].reg;
 			NEXT;
 			assert(ins->op == IR_EXTRA);
+			assert(ins->valtype == VT_TEMP);
 			total += mov_mr64_r64(text, proc->temps.data[ins->val].reg, src);
 			NEXT;
 			break;
 		case IR_ASSIGN:
 			assert(ins->valtype == VT_TEMP);
-			tmp = ins->val;
 			dest = proc->temps.data[ins->val].reg;
 			size = proc->temps.data[ins->val].size;
 			NEXT;
 
 			switch (ins->op) {
 			case IR_CEQ:
+				assert(ins->valtype == VT_TEMP);
 				src = proc->temps.data[ins->val].reg;
 				NEXT;
+				assert(ins->op == IR_EXTRA);
+				assert(ins->valtype == VT_TEMP);
 				switch (size) {
 				case 8:
 					total += cmp_r64_r64(text, src, proc->temps.data[ins->val].reg);
@@ -876,6 +880,8 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 				case 1:
 					total += cmp_r8_r8(text, src, proc->temps.data[ins->val].reg);
 					break;
+				default:
+					die("x64 emitblock: IR_CEQ: bad size");
 				}
 				total += sete_reg(text, dest);
 				NEXT;
@@ -884,6 +890,8 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 				assert(ins->valtype == VT_TEMP);
 				total += mov_r64_r64(text, dest, proc->temps.data[ins->val].reg);
 				NEXT;
+				assert(ins->op == IR_EXTRA);
+				assert(ins->valtype == VT_TEMP);
 				total += add_r64_r64(text, dest, proc->temps.data[ins->val].reg);
 				NEXT;
 				break;
@@ -981,6 +989,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 
 			NEXT;
 			while (ins < end && ins->op == IR_CALLARG) {
+				assert(ins->valtype == VT_TEMP);
 				count++;
 				total += push_r64(text, proc->temps.data[ins->val].reg);
 				NEXT;
@@ -1002,6 +1011,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 			if (ins->val == end_label)
 				goto done;
 
+			curlabel = ins->val;
 			NEXT;
 			break;
 		case IR_IMM:
