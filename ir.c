@@ -141,6 +141,13 @@ putins(struct iproc *out, int op, uint64_t val, int valtype)
 	array_add(out, ins);
 }
 
+static uint64_t
+bumplabel(struct iproc *out)
+{
+	array_add((&out->labels), curi);
+	return labeli++;
+}
+
 static size_t
 assign(struct iproc *out, uint8_t size)
 {
@@ -300,8 +307,8 @@ genexpr(struct iproc *out, size_t expri, uint64_t *val)
 	case EXPR_COND: {
 		uint64_t condtmp;
 		int valtype = genexpr(out, expr->d.cond.cond, &condtmp);
-		size_t elselabel = labeli++;
-		size_t endlabel = labeli++;
+		size_t elselabel = bumplabel(out);
+		size_t endlabel = bumplabel(out);
 		STARTINS(IR_CONDJUMP, elselabel, VT_LABEL);
 		putins(out, IR_EXTRA, condtmp, valtype);
 		genblock(out, &expr->d.cond.bif);
@@ -428,6 +435,8 @@ genproc(struct decl *decl, struct proc *proc)
 
 	// put a blank interval, since tmpi starts at 1
 	array_add((&iproc.temps), interval);
+	array_add((&iproc.labels), labeli);
+
 	size_t i = 0;
 
 	for (size_t j = 0; j < proc->in.len; j++, i++) {

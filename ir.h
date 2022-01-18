@@ -60,6 +60,11 @@ struct iproc {
 		size_t cap;
 		struct temp *data;
 	} temps;
+	struct {
+		size_t len;
+		size_t cap;
+		uint64_t *data; // instruction offset in function
+	} labels;
 };
 
 struct iprocs {
