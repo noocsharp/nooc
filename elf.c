@@ -6,7 +6,7 @@
 #include "elf.h"
 
 void
-elf(size_t entry, char *text, size_t len, char* data, size_t dlen, FILE *f)
+elf(size_t entry, struct data *text, struct data *data, FILE *f)
 {
 	Elf64_Ehdr ehdr = { 0 };
 	Elf64_Phdr phdr_text = { 0 };
@@ -38,8 +38,8 @@ elf(size_t entry, char *text, size_t len, char* data, size_t dlen, FILE *f)
 	phdr_text.p_offset = 0x1000;
 	phdr_text.p_vaddr = TEXT_OFFSET;
 	phdr_text.p_paddr = TEXT_OFFSET;
-	phdr_text.p_filesz = len;
-	phdr_text.p_memsz = len;
+	phdr_text.p_filesz = text->len;
+	phdr_text.p_memsz = text->len;
 	phdr_text.p_flags = PF_R | PF_X;
 	phdr_text.p_align = 0x1000;
 
@@ -47,8 +47,8 @@ elf(size_t entry, char *text, size_t len, char* data, size_t dlen, FILE *f)
 	phdr_data.p_offset = 0x2000;
 	phdr_data.p_vaddr = DATA_OFFSET;
 	phdr_data.p_paddr = DATA_OFFSET;
-	phdr_data.p_filesz = dlen;
-	phdr_data.p_memsz = dlen;
+	phdr_data.p_filesz = data->len;
+	phdr_data.p_memsz = data->len;
 	phdr_data.p_flags = PF_R | PF_W;
 	phdr_data.p_align = 0x1000;
 
@@ -60,9 +60,9 @@ elf(size_t entry, char *text, size_t len, char* data, size_t dlen, FILE *f)
 	for (int i = 0; i < 0x1000 - pretextlen; i++) {
 		fwrite(&empty, 1, 1, f);
 	}
-	fwrite(text, 1, len, f);
-	for (int i = 0; i < 0x1000 - len; i++) {
+	fwrite(text->data, 1, text->len, f);
+	for (int i = 0; i < 0x1000 - text->len; i++) {
 		fwrite(&empty, 1, 1, f);
 	}
-	fwrite(data, 1, dlen, f);
+	fwrite(data->data, 1, data->len, f);
 }

@@ -37,27 +37,24 @@ struct toplevel toplevel;
 
 char *infile;
 
-// TODO: remove
-struct data data_seg;
-
 uint64_t
 data_push(char *ptr, size_t len)
 {
-	array_push((&data_seg), ptr, len);
-	return DATA_OFFSET + data_seg.len - len;
+	array_push((&toplevel.data), ptr, len);
+	return DATA_OFFSET + toplevel.data.len - len;
 }
 
 uint64_t
 data_pushzero(size_t len)
 {
-	array_zero((&data_seg), len);
-	return DATA_OFFSET + data_seg.len - len;
+	array_zero((&toplevel.data), len);
+	return DATA_OFFSET + toplevel.data.len - len;
 }
 
 void
 data_set(uint64_t addr, void *ptr, size_t len)
 {
-	memcpy(&data_seg.data[addr - DATA_OFFSET], ptr, len);
+	memcpy(&toplevel.data.data[addr - DATA_OFFSET], ptr, len);
 }
 
 void
@@ -198,7 +195,7 @@ main(int argc, char *argv[])
 
 	munmap(addr, statbuf.st_size);
 
-	elf(toplevel.entry, toplevel.text.data, toplevel.text.len, data_seg.data, data_seg.len, out);
+	elf(toplevel.entry, &toplevel.text, &toplevel.data, out);
 
 	fclose(out);
 }
