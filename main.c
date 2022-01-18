@@ -114,15 +114,15 @@ gentoplevel(struct toplevel *toplevel, struct block *block)
 		curaddr += targ.emitsyscall(&toplevel->text, i);
 	}
 	for (int i = 0; i < block->len; i++) {
-		struct item *item = &block->data[i];
+		struct statement *statement = &block->data[i];
 
-		switch (item->kind) {
-		case ITEM_EXPR:
+		switch (statement->kind) {
+		case STMT_EXPR:
 			die("toplevel expressions are unimplemented");
-		case ITEM_ASSGN:
+		case STMT_ASSGN:
 			die("toplevel assignments are unimplemented");
-		case ITEM_DECL: {
-			struct decl *decl = &block->decls.data[item->idx];
+		case STMT_DECL: {
+			struct decl *decl = &block->decls.data[statement->idx];
 			struct expr *expr = &exprs.data[decl->val];
 
 			decl_alloc(block, decl);
@@ -185,9 +185,9 @@ main(int argc, char *argv[])
 
 	typesmap = mkmap(16);
 	inittypes();
-	struct block items = parse(head);
+	struct block statements = parse(head);
 
-	gentoplevel(&toplevel, &items);
+	gentoplevel(&toplevel, &statements);
 
 	FILE *out = fopen(argv[2], "w");
 	if (!out) {

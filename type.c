@@ -269,12 +269,12 @@ void
 typecheck(struct block *block)
 {
 	for (size_t i = 0; i < block->len; i++) {
-		struct item *item = &block->data[i];
+		struct statement *statement = &block->data[i];
 		struct decl *decl;
 		struct assgn *assgn;
 		switch (block->data[i].kind) {
-		case ITEM_ASSGN:
-			assgn = &assgns.data[item->idx];
+		case STMT_ASSGN:
+			assgn = &assgns.data[statement->idx];
 			decl = finddecl(assgn->s);
 			if (decl == NULL)
 				error(assgn->start->line, assgn->start->col, "typecheck: unknown name '%.*s'", assgn->s.len, assgn->s.data);
@@ -287,16 +287,16 @@ typecheck(struct block *block)
 				typecompat(decl->type, assgn->val);
 			}
 			break;
-		case ITEM_DECL:
-			decl = &block->decls.data[item->idx];
+		case STMT_DECL:
+			decl = &block->decls.data[statement->idx];
 			typecheckexpr(decl->val);
 			typecompat(decl->type, decl->val);
 			break;
-		case ITEM_EXPR:
-		case ITEM_RETURN:
+		case STMT_EXPR:
+		case STMT_RETURN:
 			break;
 		default:
-			error(item->start->line, item->start->col, "unknown item type");
+			error(statement->start->line, statement->start->col, "unknown statement type");
 		}
 	}
 }

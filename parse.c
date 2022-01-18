@@ -380,7 +380,7 @@ parsenametypes(struct nametypes *nametypes)
 static void
 parseblock(struct block *block)
 {
-	struct item item;
+	struct statement statement;
 	bool curlies = false;
 
 	blockpush(block);
@@ -390,13 +390,13 @@ parseblock(struct block *block)
 	}
 
 	while (!(tok->type == TOK_NONE || (curlies && tok->type == TOK_RCURLY))) {
-		item = (struct item){ 0 };
-		item.start = tok;
+		statement = (struct statement){ 0 };
+		statement.start = tok;
 		if (tok->type == TOK_LET) {
 			struct decl decl = { 0 };
 			decl.toplevel = !(blocki - 1);
 			decl.start = tok;
-			item.kind = ITEM_DECL;
+			statement.kind = STMT_DECL;
 			tok = tok->next;
 
 			expect(TOK_NAME);
@@ -415,28 +415,28 @@ parseblock(struct block *block)
 			decl.val = parseexpr(block);
 			array_add((&block->decls), decl);
 
-			item.idx = block->decls.len - 1;
-			array_add((block), item);
+			statement.idx = block->decls.len - 1;
+			array_add((block), statement);
 		} else if (tok->type == TOK_RETURN) {
-			item.kind = ITEM_RETURN;
+			statement.kind = STMT_RETURN;
 			tok = tok->next;
-			array_add((block), item);
+			array_add((block), statement);
 		} else if (tok->type == TOK_NAME && tok->next && tok->next->type == TOK_EQUAL) {
 			struct assgn assgn = { 0 };
 			assgn.start = tok;
-			item.kind = ITEM_ASSGN;
+			statement.kind = STMT_ASSGN;
 			assgn.s = tok->slice;
 
 			tok = tok->next->next;
 			assgn.val = parseexpr(block);
 			array_add((&assgns), assgn);
 
-			item.idx = assgns.len - 1;
-			array_add(block, item);
+			statement.idx = assgns.len - 1;
+			array_add(block, statement);
 		} else {
-			item.kind = ITEM_EXPR;
-			item.idx = parseexpr(block);
-			array_add(block, item);
+			statement.kind = STMT_EXPR;
+			statement.idx = parseexpr(block);
+			array_add(block, statement);
 		}
 	}
 

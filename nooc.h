@@ -144,12 +144,12 @@ struct data {
 	char *data;
 };
 
-struct item {
+struct statement {
 	enum {
-		ITEM_DECL,
-		ITEM_ASSGN,
-		ITEM_EXPR,
-		ITEM_RETURN,
+		STMT_DECL,
+		STMT_ASSGN,
+		STMT_EXPR,
+		STMT_RETURN,
 	} kind;
 	size_t idx;
 	struct token *start;
@@ -164,7 +164,7 @@ struct block {
 	size_t datasize;
 	size_t cap;
 	size_t len;
-	struct item *data;
+	struct statement *data;
 };
 
 struct cond {

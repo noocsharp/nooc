@@ -331,12 +331,12 @@ genblock(struct iproc *out, struct block *block)
 	blockpush(block);
 
 	for (size_t i = 0; i < block->len; i++) {
-		struct item *item = &block->data[i];
+		struct statement *statement = &block->data[i];
 		uint64_t what;
 		size_t val;
-		switch (item->kind) {
-		case ITEM_DECL:
-			decl = &block->decls.data[item->idx];
+		switch (statement->kind) {
+		case STMT_DECL:
+			decl = &block->decls.data[statement->idx];
 			type = &types.data[decl->type];
 			switch (type->size) {
 			case 1:
@@ -350,8 +350,8 @@ genblock(struct iproc *out, struct block *block)
 			}
 			val = decl->val;
 			goto decl_assign_common;
-		case ITEM_ASSGN:
-			assgn = &assgns.data[item->idx];
+		case STMT_ASSGN:
+			assgn = &assgns.data[statement->idx];
 			decl = finddecl(assgn->s);
 			type = &types.data[decl->type];
 			val = assgn->val;
@@ -374,10 +374,10 @@ decl_assign_common:
 				}
 			}
 			break;
-		case ITEM_EXPR:
-			genexpr(out, item->idx, &what);
+		case STMT_EXPR:
+			genexpr(out, statement->idx, &what);
 			break;
-		case ITEM_RETURN:
+		case STMT_RETURN:
 			STARTINS(IR_RETURN, 0, VT_EMPTY);
 			break;
 		default:
