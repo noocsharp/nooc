@@ -19,6 +19,7 @@ extern struct assgns assgns;
 extern struct toplevel toplevel;
 
 #define STARTINS(op, val, valtype) putins((out), (op), (val), (valtype)) ; curi++ ;
+#define LABEL(l) array_addlit((&out->labels), reali); STARTINS(IR_LABEL, l, VT_LABEL);
 #define NEWTMP tmpi++; interval.start = curi + 1; interval.end = curi + 1; array_add((&out->temps), interval);
 
 #define PTRSIZE 8
@@ -28,6 +29,7 @@ extern struct target targ;
 static uint64_t tmpi;
 static uint64_t labeli;
 static uint64_t curi;
+static uint64_t reali;
 static struct temp interval;
 static uint16_t regs; // used register bitfield
 
@@ -139,12 +141,12 @@ putins(struct iproc *out, int op, uint64_t val, int valtype)
 	}
 
 	array_add(out, ins);
+	reali++;
 }
 
 static uint64_t
 bumplabel(struct iproc *out)
 {
-	array_add((&out->labels), curi);
 	return labeli++;
 }
 
@@ -193,7 +195,7 @@ static int
 genexpr(struct iproc *out, size_t expri, uint64_t *val)
 {
 	struct expr *expr = &exprs.data[expri];
-	uint64_t temp2 = 0;
+	uint64_t temp2 = 0, temp;
 	switch (expr->kind) {
 	case EXPR_LIT:
 		switch (expr->class) {
@@ -307,16 +309,21 @@ genexpr(struct iproc *out, size_t expri, uint64_t *val)
 	case EXPR_COND: {
 		uint64_t condtmp;
 		int valtype = genexpr(out, expr->d.cond.cond, &condtmp);
-		size_t elselabel = bumplabel(out);
 		size_t endlabel = bumplabel(out);
-		STARTINS(IR_CONDJUMP, elselabel, VT_LABEL);
-		putins(out, IR_EXTRA, condtmp, valtype);
-		genblock(out, &expr->d.cond.bif);
-		STARTINS(IR_JUMP, endlabel, VT_LABEL);
 		if (expr->d.cond.belse.len) {
-			putins(out, IR_LABEL, elselabel, VT_LABEL);
+			size_t elselabel = bumplabel(out);
+			STARTINS(IR_CONDJUMP, elselabel, VT_LABEL);
+			putins(out, IR_EXTRA, condtmp, valtype);
+			genblock(out, &expr->d.cond.bif);
+			STARTINS(IR_JUMP, endlabel, VT_LABEL);
+			LABEL(elselabel);
 			genblock(out, &expr->d.cond.belse);
-			putins(out, IR_LABEL, endlabel, VT_LABEL);
+			LABEL(endlabel);
+		} else {
+			STARTINS(IR_CONDJUMP, endlabel, VT_LABEL);
+			putins(out, IR_EXTRA, condtmp, valtype);
+			genblock(out, &expr->d.cond.bif);
+			LABEL(endlabel);
 		}
 		return VT_EMPTY;
 	}
@@ -424,6 +431,7 @@ size_t
 genproc(struct decl *decl, struct proc *proc)
 {
 	tmpi = labeli = curi = 1;
+	reali = 0;
 	regs = targ.reserved;
 	struct type *type;
 	struct iproc iproc = {

@@ -795,14 +795,14 @@ emitsyscall(struct data *text, uint8_t paramcount)
 }
 
 size_t
-emitblock(struct data *text, struct iproc *proc, struct instr *start, struct instr *end, uint64_t end_label, uint16_t active, uint16_t curi)
+emitblock(struct data *text, struct iproc *proc, struct instr *start, struct instr *end, uint16_t active, uint16_t curi)
 {
 	struct instr *ins = start ? start : proc->data;
 	end = end ? end : &proc->data[proc->len];
 
 	uint64_t dest, src, size, count, label;
 	int64_t offset;
-	uint64_t localalloc = 0, curlabel = 0;
+	uint64_t localalloc = 0;
 
 	size_t total = 0;
 	if (!start) {
@@ -820,11 +820,14 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 				active |= 1 << proc->temps.data[j].reg;
 		}
 		switch (ins->op) {
-		// FIXME: we don't handle jumps backward yet
 		case IR_JUMP:
 			assert(ins->valtype == VT_LABEL);
 			label = ins->val;
-			total += jmp(text, emitblock(NULL, proc, ins + 1, end, label, active, curi));
+			if (ins < &proc->data[proc->labels.data[label]]) {
+				total += jmp(text, emitblock(NULL, proc, ins + 1, &proc->data[proc->labels.data[label]], active, curi));
+			} else {
+				total += jmp(text, emitblock(NULL, proc, start, &proc->data[proc->labels.data[label]], 0, 0) - total - 2); // FIXME: 2 = size of short jump
+			}
 			NEXT;
 			break;
 		case IR_CONDJUMP:
@@ -835,7 +838,11 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 			assert(ins->op == IR_EXTRA);
 			assert(ins->valtype == VT_TEMP);
 			total += cmp_r8_imm(text, proc->temps.data[ins->val].reg, 0);
-			total += je(text, emitblock(NULL, proc, ins + 1, end, label, active, curi));
+			if (ins < &proc->data[proc->labels.data[label]]) {
+				total += je(text, emitblock(NULL, proc, ins + 1, &proc->data[proc->labels.data[label]], active, curi));
+			} else {
+				total += je(text, emitblock(NULL, proc, start, &proc->data[proc->labels.data[label]], 0, 0)- total - 2); // FIXME: 2 = size of short jump
+			}
 			NEXT;
 			break;
 		case IR_RETURN:
@@ -1008,10 +1015,6 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 			break;
 		case IR_LABEL:
 			assert(ins->valtype == VT_LABEL);
-			if (ins->val == end_label)
-				goto done;
-
-			curlabel = ins->val;
 			NEXT;
 			break;
 		case IR_IMM:
@@ -1029,5 +1032,5 @@ done:
 size_t
 emitproc(struct data *text, struct iproc *proc)
 {
-	return emitblock(text, proc, NULL, NULL, 0, 0, 0);
+	return emitblock(text, proc, NULL, NULL, 0, 0);
 }
