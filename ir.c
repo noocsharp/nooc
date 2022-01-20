@@ -327,6 +327,13 @@ genexpr(struct iproc *out, size_t expri, uint64_t *val)
 		}
 		return VT_EMPTY;
 	}
+	case EXPR_LOOP: {
+		size_t start = bumplabel(out);
+		LABEL(start);
+		genblock(out, &expr->d.loop.block);
+		STARTINS(IR_JUMP, start, VT_LABEL);
+		return VT_EMPTY;
+	}
 	default:
 		die("genexpr: expr kind");
 	}
