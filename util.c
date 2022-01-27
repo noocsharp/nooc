@@ -219,7 +219,12 @@ dumpir(struct iproc *instrs)
 	putc('\n', stderr);
 
 	for (size_t i = 0; i < instrs->temps.len; i++) {
-		fprintf(stderr, "%lu: %lu to %lu\n", i, instrs->temps.data[i].start, instrs->temps.data[i].end);
+		fprintf(stderr, "%lu: using %d from  %lu to %lu\n", i, instrs->temps.data[i].reg, instrs->temps.data[i].start, instrs->temps.data[i].end);
+	}
+
+	putc('\n', stderr);
+	for (size_t i = 0; i < instrs->labels.len; i++) {
+		fprintf(stderr, "%lu: %lu\n", i, instrs->labels.data[i]);
 	}
 }
 
