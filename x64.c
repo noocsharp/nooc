@@ -852,7 +852,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 			if (ins < &proc->data[proc->labels.data[label]]) {
 				total += je(text, emitblock(NULL, proc, ins + 1, &proc->data[proc->labels.data[label]], active, curi));
 			} else {
-				total += je(text, emitblock(NULL, proc, start, &proc->data[proc->labels.data[label]], 0, 0)- total - 2); // FIXME: 2 = size of short jump
+				total += je(text, emitblock(NULL, proc, start, &proc->data[proc->labels.data[label]], 0, 0) - total - 2); // FIXME: 2 = size of short jump
 			}
 			NEXT;
 			break;
@@ -1036,7 +1036,6 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 		}
 	}
 
-done:
 	return total;
 }
 
