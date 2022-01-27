@@ -652,13 +652,24 @@ static size_t
 je(struct data *text, int64_t offset)
 {
 	uint8_t temp;
-	if (-256 <= offset && offset <= 255) {
+	if (-128 <= offset && offset <= 127) {
 		int8_t i = offset;
 		if (text) {
 			array_addlit(text, 0x74);
-			array_addlit(text, i);
+			array_add(text, i);
 		}
 		return 2;
+	} else if (-2147483648 <= offset && offset <= 2147483647) {
+		int32_t i = offset;
+		if (text) {
+			array_addlit(text, 0x0F);
+			array_addlit(text, 0x84);
+			array_addlit(text, ((uint32_t) i) & 0xFF);
+			array_addlit(text, (((uint32_t) i) >> 8) & 0xFF);
+			array_addlit(text, (((uint32_t) i) >> 16) & 0xFF);
+			array_addlit(text, (((uint32_t) i) >> 24) & 0xFF);
+		}
+		return 6;
 	} else {
 		die("unimplemented je offet!");
 	}
