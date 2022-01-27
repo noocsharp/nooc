@@ -38,6 +38,14 @@ struct instr {
 	} valtype;
 };
 
+struct iblock {
+	uint64_t start, end;
+	struct {
+		size_t len, cap;
+		uint64_t *data;
+	} used;
+};
+
 struct temp {
 	uint64_t start;
 	uint64_t end;
@@ -47,6 +55,7 @@ struct temp {
 	} flags;
 	uint8_t size;
 	uint8_t reg;
+	uint64_t block;
 };
 
 struct iproc {
@@ -55,6 +64,11 @@ struct iproc {
 	struct instr *data;
 	uint64_t addr; // FIXME: 'addr' and 's' are only necessary because syscalls are intrinsics.
 	struct slice s; // Once syscalls are moved out, we can just use the decl fields and have a pointer to the declaration.
+	struct {
+		size_t len;
+		size_t cap;
+		struct iblock *data;
+	} blocks;
 	struct {
 		size_t len;
 		size_t cap;

@@ -19,17 +19,15 @@ extern struct assgns assgns;
 extern struct toplevel toplevel;
 
 #define STARTINS(op, val, valtype) putins((out), (op), (val), (valtype)) ; curi++ ;
-#define LABEL(l) array_addlit((&out->labels), reali); STARTINS(IR_LABEL, l, VT_LABEL);
-#define NEWTMP tmpi++; interval.start = curi + 1; interval.end = curi + 1; array_add((&out->temps), interval);
+#define LABEL(l) out->labels.data[l] = reali; STARTINS(IR_LABEL, l, VT_LABEL);
+#define NEWTMP tmpi++; { struct temp temp = { .start = curi + 1, .end = curi + 1, .block = rblocki - 1 }; array_add((&out->temps), temp); }
+#define NEWBLOCK(start, end) { struct iblock block = { (start), (end), .used = { 0 } }; array_add((&out->blocks), block); } rblocki++;
 
 #define PTRSIZE 8
 
 extern struct target targ;
 
-static uint64_t tmpi;
-static uint64_t labeli;
-static uint64_t curi;
-static uint64_t reali;
+static uint64_t tmpi, labeli, curi, reali, rblocki;
 static struct temp interval;
 static uint16_t regs; // used register bitfield
 
@@ -99,6 +97,7 @@ putins(struct iproc *out, int op, uint64_t val, int valtype)
 			die("putins: bad op for VT_TEMP");
 		}
 		out->temps.data[val].end = curi;
+		array_add((&out->blocks.data[rblocki - 1].used), val);
 		break;
 	case VT_LABEL:
 		switch (op) {
@@ -147,6 +146,8 @@ putins(struct iproc *out, int op, uint64_t val, int valtype)
 static uint64_t
 bumplabel(struct iproc *out)
 {
+	uint64_t temp;
+	array_addlit((&out->labels), 0);
 	return labeli++;
 }
 
@@ -195,7 +196,7 @@ static int
 genexpr(struct iproc *out, size_t expri, uint64_t *val)
 {
 	struct expr *expr = &exprs.data[expri];
-	uint64_t temp2 = 0, temp;
+	uint64_t temp2 = 0;
 	switch (expr->kind) {
 	case EXPR_LIT:
 		switch (expr->class) {
@@ -309,29 +310,41 @@ genexpr(struct iproc *out, size_t expri, uint64_t *val)
 	case EXPR_COND: {
 		uint64_t condtmp;
 		int valtype = genexpr(out, expr->d.cond.cond, &condtmp);
-		size_t endlabel = bumplabel(out);
+		size_t startlabel = bumplabel(out), endlabel = bumplabel(out);
 		if (expr->d.cond.belse.len) {
 			size_t elselabel = bumplabel(out);
+			blockpush(&expr->d.cond.bif);
+			NEWBLOCK(startlabel, elselabel);
+			LABEL(startlabel);
 			STARTINS(IR_CONDJUMP, elselabel, VT_LABEL);
 			putins(out, IR_EXTRA, condtmp, valtype);
 			genblock(out, &expr->d.cond.bif);
+			blockpop();
 			STARTINS(IR_JUMP, endlabel, VT_LABEL);
+			blockpush(&expr->d.cond.belse);
+			NEWBLOCK(elselabel, endlabel);
 			LABEL(elselabel);
 			genblock(out, &expr->d.cond.belse);
+			blockpop();
 			LABEL(endlabel);
 		} else {
+			blockpush(&expr->d.cond.bif);
 			STARTINS(IR_CONDJUMP, endlabel, VT_LABEL);
+			NEWBLOCK(startlabel, endlabel);
 			putins(out, IR_EXTRA, condtmp, valtype);
 			genblock(out, &expr->d.cond.bif);
+			blockpop();
 			LABEL(endlabel);
 		}
 		return VT_EMPTY;
 	}
 	case EXPR_LOOP: {
-		size_t start = bumplabel(out);
-		LABEL(start);
+		size_t startlabel = bumplabel(out), endlabel = bumplabel(out);
+		NEWBLOCK(startlabel, endlabel);
+		LABEL(startlabel);
 		genblock(out, &expr->d.loop.block);
-		STARTINS(IR_JUMP, start, VT_LABEL);
+		STARTINS(IR_JUMP, startlabel, VT_LABEL);
+		LABEL(endlabel);
 		return VT_EMPTY;
 	}
 	default:
@@ -372,8 +385,6 @@ genblock(struct iproc *out, struct block *block)
 	struct type *type;
 	struct assgn *assgn;
 
-	blockpush(block);
-
 	for (size_t i = 0; i < block->len; i++) {
 		struct statement *statement = &block->data[i];
 		uint64_t what;
@@ -408,7 +419,6 @@ genblock(struct iproc *out, struct block *block)
 			die("ir_genproc: unreachable");
 		}
 	}
-	blockpop();
 }
 
 static void
@@ -416,6 +426,18 @@ chooseregs(struct iproc *proc)
 {
 	bool active[proc->temps.len];
 	memset(active, 0, proc->temps.len * sizeof(*active));
+
+	// FIXME: can this happen in the generation loop?
+	for (size_t i = 0; i < proc->blocks.len; i++) {
+		for (size_t j = 0; j < proc->blocks.data[i].used.len; j++) {
+			uint64_t *curend = &proc->temps.data[proc->blocks.data[i].used.data[j]].end;
+			uint64_t curblock = proc->temps.data[proc->blocks.data[i].used.data[j]].block;
+			uint64_t blockend = proc->labels.data[proc->blocks.data[i].end];
+			if (curblock != i && *curend < blockend) {
+				*curend = blockend;
+			}
+		}
+	}
 
 	// FIXME: this is obviously not close to optimal
 	for (uint64_t i = 0; i <= curi; i++) {
@@ -438,7 +460,7 @@ size_t
 genproc(struct decl *decl, struct proc *proc)
 {
 	tmpi = labeli = curi = 1;
-	reali = 0;
+	rblocki = reali = 0;
 	regs = targ.reserved;
 	struct type *type;
 	struct iproc iproc = {
@@ -452,8 +474,16 @@ genproc(struct decl *decl, struct proc *proc)
 	array_add((&iproc.temps), interval);
 	array_add((&iproc.labels), labeli);
 
+	size_t startlabel = bumplabel(out), endlabel = bumplabel(out);
+	{
+		struct iblock block = { startlabel, endlabel, .used = { 0 } };
+		array_add((&out->blocks), block);
+		rblocki++;
+	}
+
 	size_t i = 0;
 
+	LABEL(startlabel);
 	for (size_t j = 0; j < proc->in.len; j++, i++) {
 		struct decl *decl = finddecl(proc->in.data[j].name);
 		type = &types.data[proc->in.data[j].type];
@@ -476,7 +506,11 @@ genproc(struct decl *decl, struct proc *proc)
 		putins(out, IR_IN, i, VT_IMM);
 	}
 
+	blockpush(&proc->block);
 	genblock(out, &proc->block);
+	blockpop();
+
+	LABEL(endlabel);
 	chooseregs(&iproc);
 	array_add((&toplevel.code), iproc);
 
