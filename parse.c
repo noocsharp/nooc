@@ -237,6 +237,16 @@ parseexpr(struct block *block)
 	case TOK_NUM:
 		parsenum(&expr);
 		break;
+	case TOK_NOT:
+		expr.start = tok;
+		tok = tok->next;
+		expr.kind = EXPR_UNARY;
+		expr.d.uop.kind = UOP_NOT;
+		expr.d.uop.expr = parseexpr(block);
+		if (exprs.data[expr.d.uop.expr].class != C_BOOL)
+			error(tok->line, tok->col, "expected boolean expression as not operand");
+		expr.class = C_BOOL;
+		break;
 	case TOK_EQUAL:
 		expr.kind = EXPR_BINARY;
 		expr.d.bop.kind = BOP_EQUAL;

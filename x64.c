@@ -692,6 +692,20 @@ sete_reg(struct data *text, enum reg reg)
 }
 
 static size_t
+setne_reg(struct data *text, enum reg reg)
+{
+	uint8_t temp;
+	if (text) {
+		if (reg >= 8) array_addlit(text, REX_B);
+		array_addlit(text, 0x0F);
+		array_addlit(text, 0x95);
+		array_addlit(text, (MOD_DIRECT << 6) | (reg & 7));
+	}
+
+	return 3 + !(reg < 8);
+}
+
+static size_t
 jmp(struct data *text, int64_t offset)
 {
 	uint8_t temp;
@@ -879,6 +893,13 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 			NEXT;
 
 			switch (ins->op) {
+			case IR_NOT:
+				assert(ins->valtype == VT_TEMP);
+				assert(size == 4);
+				total += cmp_r32_r32(text, src, proc->temps.data[ins->val].reg);
+				total += setne_reg(text, dest);
+				NEXT;
+				break;
 			case IR_CEQ:
 				assert(ins->valtype == VT_TEMP);
 				src = proc->temps.data[ins->val].reg;

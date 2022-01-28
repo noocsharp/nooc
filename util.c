@@ -184,6 +184,9 @@ dumpir(struct iproc *instrs)
 		case IR_CEQ:
 			fprintf(stderr, "ceq %c%lu", sig, instr->val);
 			break;
+		case IR_NOT:
+			fprintf(stderr, "not %c%lu\n", sig, instr->val);
+			break;
 		case IR_ZEXT:
 			fprintf(stderr, "zext %c%lu\n", sig, instr->val);
 			break;

@@ -17,6 +17,7 @@ enum tokentype {
 	TOK_PLUS,
 	TOK_MINUS,
 	TOK_GREATER,
+	TOK_NOT,
 
 	TOK_DOLLAR,
 
@@ -197,6 +198,7 @@ struct binop {
 struct unop {
 	enum {
 		UOP_REF,
+		UOP_NOT,
 	} kind;
 	size_t expr;
 };

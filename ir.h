@@ -14,6 +14,9 @@ struct instr {
 		IR_CONDJUMP,
 		IR_JUMP,
 
+		// unary ops
+		IR_NOT,
+
 		// binary ops
 		IR_ADD,
 

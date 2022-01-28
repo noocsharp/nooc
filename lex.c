@@ -57,6 +57,9 @@ lex(struct slice start)
 		} else if (*start.data == '>') {
 			cur->type = TOK_GREATER;
 			ADVANCE(1);
+		} else if (*start.data == '!') {
+			cur->type = TOK_NOT;
+			ADVANCE(1);
 		} else if (*start.data == '$') {
 			cur->type = TOK_DOLLAR;
 			ADVANCE(1);

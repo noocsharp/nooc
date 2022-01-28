@@ -88,6 +88,7 @@ putins(struct iproc *out, int op, uint64_t val, int valtype)
 		case IR_LOAD:
 		case IR_ADD:
 		case IR_CEQ:
+		case IR_NOT:
 		case IR_ZEXT:
 		case IR_ASSIGN:
 		case IR_CALLARG:
@@ -274,6 +275,14 @@ genexpr(struct iproc *out, size_t expri, uint64_t *val)
 			} else {
 				*val = decl->index;
 			}
+			break;
+		}
+		case UOP_NOT: {
+			uint64_t arg;
+			int type = genexpr(out, expr->d.uop.expr, &arg);
+			assert(type == VT_TEMP);
+			*val = assign(out, 4); // FIXME: how big should bools be?
+			putins(out, IR_NOT, arg, VT_TEMP);
 			break;
 		}
 		default:
