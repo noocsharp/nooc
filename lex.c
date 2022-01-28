@@ -18,7 +18,7 @@ lex(struct slice start)
 {
 	size_t line = 1;
 	size_t col = 1;
-	struct token *head = calloc(1, sizeof(struct token));
+	struct token *const head = calloc(1, sizeof(struct token));
 	if (!head)
 		return NULL;
 

@@ -38,21 +38,21 @@ struct toplevel toplevel;
 char *infile;
 
 uint64_t
-data_push(char *ptr, size_t len)
+data_push(const char *const ptr, const size_t len)
 {
 	array_push((&toplevel.data), ptr, len);
 	return DATA_OFFSET + toplevel.data.len - len;
 }
 
 uint64_t
-data_pushzero(size_t len)
+data_pushzero(const size_t len)
 {
 	array_zero((&toplevel.data), len);
 	return DATA_OFFSET + toplevel.data.len - len;
 }
 
 void
-data_set(uint64_t addr, void *ptr, size_t len)
+data_set(const uint64_t addr, const void *const ptr, const size_t len)
 {
 	memcpy(&toplevel.data.data[addr - DATA_OFFSET], ptr, len);
 }
@@ -60,9 +60,9 @@ data_set(uint64_t addr, void *ptr, size_t len)
 void
 decl_alloc(struct block *block, struct decl *decl)
 {
-	struct type *type = &types.data[decl->type];
+	const struct type *const type = &types.data[decl->type];
 	if (type->class == TYPE_ARRAY) {
-		struct type *subtype = &types.data[type->d.arr.subtype];
+		const struct type *const subtype = &types.data[type->d.arr.subtype];
 		decl->w.addr = data_pushzero(subtype->size * type->d.arr.len);
 	} else {
 		decl->w.addr = data_pushzero(type->size);
@@ -70,18 +70,18 @@ decl_alloc(struct block *block, struct decl *decl)
 }
 
 void
-evalexpr(struct decl *decl)
+evalexpr(struct decl *const decl)
 {
 	struct expr *expr = &exprs.data[decl->val];
 	if (expr->kind == EXPR_LIT) {
 		switch (expr->class) {
 		case C_INT: {
-			struct type *type = &types.data[decl->type];
+			const struct type *const type = &types.data[decl->type];
 			data_set(decl->w.addr, &expr->d.v.v, type->size);
 			break;
 		}
 		case C_STR: {
-			uint64_t addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
+			const uint64_t addr = data_push(expr->d.v.v.s.data, expr->d.v.v.s.len);
 			decl->w.addr = addr;
 			break;
 		}
@@ -111,7 +111,7 @@ gentoplevel(struct toplevel *toplevel, struct block *block)
 		curaddr += targ.emitsyscall(&toplevel->text, i);
 	}
 	for (int i = 0; i < block->len; i++) {
-		struct statement *statement = &block->data[i];
+		const struct statement *const statement = &block->data[i];
 
 		switch (statement->kind) {
 		case STMT_EXPR:
@@ -119,8 +119,8 @@ gentoplevel(struct toplevel *toplevel, struct block *block)
 		case STMT_ASSGN:
 			die("toplevel assignments are unimplemented");
 		case STMT_DECL: {
-			struct decl *decl = &block->decls.data[statement->idx];
-			struct expr *expr = &exprs.data[decl->val];
+			struct decl *const decl = &block->decls.data[statement->idx];
+			struct expr *const expr = &exprs.data[decl->val];
 
 			decl_alloc(block, decl);
 
@@ -159,7 +159,7 @@ main(int argc, char *argv[])
 	}
 
 	infile = argv[1];
-	int in = open(infile, 0, O_RDONLY);
+	const int in = open(infile, 0, O_RDONLY);
 	if (in < 0) {
 		fprintf(stderr, "couldn't open input\n");
 		return 1;
@@ -171,14 +171,14 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	char *addr = mmap(NULL, statbuf.st_size, PROT_READ, MAP_PRIVATE, in, 0);
+	char *const addr = mmap(NULL, statbuf.st_size, PROT_READ, MAP_PRIVATE, in, 0);
 	close(in);
 	if (addr == NULL) {
 		fprintf(stderr, "failed to map input file into memory\n");
 		return 1;
 	}
 
-	struct token *head = lex((struct slice){statbuf.st_size, statbuf.st_size, addr});
+	const struct token *const head = lex((struct slice){statbuf.st_size, statbuf.st_size, addr});
 
 	typesmap = mkmap(16);
 	inittypes();
@@ -186,7 +186,7 @@ main(int argc, char *argv[])
 
 	gentoplevel(&toplevel, &statements);
 
-	FILE *out = fopen(argv[2], "w");
+	FILE *const out = fopen(argv[2], "w");
 	if (!out) {
 		close(in);
 		fprintf(stderr, "couldn't open output\n");

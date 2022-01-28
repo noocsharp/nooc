@@ -1,5 +1,5 @@
-size_t type_get(uint8_t hash[16]);
-size_t type_put(struct type *type);
+const size_t type_get(const uint8_t hash[16]);
+const size_t type_put(const struct type *const type);
 void inittypes();
-size_t typeref(size_t typei);
-void typecheck(struct block *block);
+const size_t typeref(const size_t typei);
+void typecheck(const struct block *const block);

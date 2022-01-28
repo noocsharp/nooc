@@ -34,8 +34,8 @@ const char *const tokenstr[] = {
 	[TOK_RETURN] = "TOK_RETURN",
 };
 
-char *
-exprkind_str(enum exprkind kind)
+const char *const
+exprkind_str(const enum exprkind kind)
 {
 	switch (kind) {
 	case EXPR_LIT:
@@ -56,7 +56,7 @@ exprkind_str(enum exprkind kind)
 }
 
 void
-dumpval(struct expr *e)
+dumpval(const struct expr *const e)
 {
 	switch (e->class) {
 	case C_INT:
@@ -75,7 +75,7 @@ dumpval(struct expr *e)
 }
 
 void
-dumpbinop(struct binop *op)
+dumpbinop(const struct binop *const op)
 {
 	switch (op->kind) {
 	case BOP_PLUS:
@@ -96,7 +96,7 @@ dumpbinop(struct binop *op)
 }
 
 void
-dumpexpr(int indent, struct expr *expr)
+dumpexpr(const int indent, const struct expr *const expr)
 {
 	for (int i = 0; i < indent; i++)
 		fputc(' ', stderr);
@@ -127,7 +127,7 @@ dumpexpr(int indent, struct expr *expr)
 }
 
 static char
-sigil(int valtype)
+sigil(const int valtype)
 {
 	switch (valtype) {
 	case VT_EMPTY:
@@ -147,7 +147,7 @@ sigil(int valtype)
 }
 
 void
-dumpir(struct iproc *instrs)
+dumpir(const struct iproc *const instrs)
 {
 	bool callarg = false;
 	char sig;
@@ -232,7 +232,7 @@ dumpir(struct iproc *instrs)
 }
 
 int
-slice_cmp(struct slice *s1, struct slice *s2)
+slice_cmp(const struct slice *const s1, const struct slice *const s2)
 {
 	if (s1->len != s2->len)
 		return 1;
@@ -241,7 +241,7 @@ slice_cmp(struct slice *s1, struct slice *s2)
 }
 
 int
-slice_cmplit(struct slice *s1, char *s2)
+slice_cmplit(const struct slice *const s1, const char *const s2)
 {
 	size_t len = strlen(s2);
 	if (s1->len < len)
@@ -251,7 +251,7 @@ slice_cmplit(struct slice *s1, char *s2)
 }
 
 void
-error(size_t line, size_t col, const char *error, ...)
+error(const size_t line, const size_t col, const char *error, ...)
 {
 	va_list args;
 
@@ -264,14 +264,14 @@ error(size_t line, size_t col, const char *error, ...)
 }
 
 void
-die(char *error)
+die(const char *const error)
 {
 	fprintf(stderr, "%s\n", error);
 	exit(1);
 }
 
 void *
-xmalloc(size_t size)
+xmalloc(const size_t size)
 {
 	char *p = malloc(size);
 	if (!p)

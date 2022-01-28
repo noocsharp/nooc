@@ -9,7 +9,7 @@
 #include "array.h"
 
 int
-_array_add(void **data, size_t *len, size_t *cap, void *new, size_t size, size_t count)
+_array_add(void **data, size_t *len, size_t *cap, const void *const new, const size_t size, const size_t count)
 {
 	bool need_realloc;
 	while (*cap < *len + count) {
@@ -28,7 +28,7 @@ _array_add(void **data, size_t *len, size_t *cap, void *new, size_t size, size_t
 
 // should only be called when size is 1
 int
-_array_zero(void **data, size_t *len, size_t *cap, size_t count)
+_array_zero(void **data, size_t *len, size_t *cap, const size_t count)
 {
 	bool need_realloc;
 	while (*cap < *len + count) {

@@ -108,7 +108,7 @@ struct nametypes {
 struct assgn {
 	struct slice s;
 	size_t val; // struct exprs
-	struct token *start;
+	const struct token *start;
 };
 
 struct assgns {
@@ -130,7 +130,7 @@ struct decl {
 		int64_t offset;
 		uint64_t addr;
 	} w;
-	struct token *start;
+	const struct token *start;
 };
 
 struct decls {
@@ -153,7 +153,7 @@ struct statement {
 		STMT_RETURN,
 	} kind;
 	size_t idx;
-	struct token *start;
+	const struct token *start;
 };
 
 struct block {
@@ -243,7 +243,7 @@ struct expr {
 		struct loop loop;
 		struct proc proc;
 	} d;
-	struct token *start;
+	const struct token *start;
 };
 
 struct exprs {

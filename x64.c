@@ -50,7 +50,7 @@ unsigned short used_reg;
 extern struct toplevel toplevel;
 
 static size_t
-add_r64_imm(struct data *text, enum reg dest, uint64_t imm)
+add_r64_imm(struct data *const text, const enum reg dest, const uint64_t imm)
 {
 	uint8_t temp;
 	if (text) {
@@ -67,7 +67,7 @@ add_r64_imm(struct data *text, enum reg dest, uint64_t imm)
 }
 
 static size_t
-mov_r64_imm(struct data *text, enum reg dest, uint64_t imm)
+mov_r64_imm(struct data *const text, const enum reg dest, const uint64_t imm)
 {
 	uint8_t temp;
 	if (text) {
@@ -87,7 +87,7 @@ mov_r64_imm(struct data *text, enum reg dest, uint64_t imm)
 }
 
 static size_t
-mov_r32_imm(struct data *text, enum reg dest, uint32_t imm)
+mov_r32_imm(struct data *const text, const enum reg dest, const uint32_t imm)
 {
 	uint8_t temp;
 	if (text) {
@@ -102,7 +102,7 @@ mov_r32_imm(struct data *text, enum reg dest, uint32_t imm)
 }
 
 static size_t
-mov_r16_imm(struct data *text, enum reg dest, uint16_t imm)
+mov_r16_imm(struct data *const text, const enum reg dest, const uint16_t imm)
 {
 	uint8_t temp;
 	if (text) {
@@ -116,7 +116,7 @@ mov_r16_imm(struct data *text, enum reg dest, uint16_t imm)
 }
 
 static size_t
-mov_r8_imm(struct data *text, enum reg dest, uint8_t imm)
+mov_r8_imm(struct data *const text, const enum reg dest, const uint8_t imm)
 {
 	uint8_t temp;
 	if (text) {
@@ -128,7 +128,7 @@ mov_r8_imm(struct data *text, enum reg dest, uint8_t imm)
 }
 
 static size_t
-mov_r64_m64(struct data *text, enum reg dest, uint64_t addr)
+mov_r64_m64(struct data *const text, const enum reg dest, const uint64_t addr)
 {
 	uint8_t temp;
 	if (text) {
@@ -146,7 +146,7 @@ mov_r64_m64(struct data *text, enum reg dest, uint64_t addr)
 }
 
 static size_t
-mov_r32_m32(struct data *text, enum reg dest, uint32_t addr)
+mov_r32_m32(struct data *const text, const enum reg dest, const uint32_t addr)
 {
 	uint8_t temp;
 	if (text) {
@@ -164,7 +164,7 @@ mov_r32_m32(struct data *text, enum reg dest, uint32_t addr)
 }
 
 static size_t
-mov_r16_m16(struct data *text, enum reg dest, uint32_t addr)
+mov_r16_m16(struct data *const text, const enum reg dest, const uint32_t addr)
 {
 	uint8_t temp;
 	if (text) {
@@ -183,7 +183,7 @@ mov_r16_m16(struct data *text, enum reg dest, uint32_t addr)
 }
 
 static size_t
-mov_r8_m8(struct data *text, enum reg dest, uint32_t addr)
+mov_r8_m8(struct data *const text, const enum reg dest, const uint32_t addr)
 {
 	uint8_t temp;
 	if (text) {
@@ -201,7 +201,7 @@ mov_r8_m8(struct data *text, enum reg dest, uint32_t addr)
 }
 
 static size_t
-mov_m64_r64(struct data *text, uint64_t addr, enum reg src)
+mov_m64_r64(struct data *const text, const uint64_t addr, const enum reg src)
 {
 	uint8_t temp;
 	if (text) {
@@ -221,7 +221,7 @@ mov_m64_r64(struct data *text, uint64_t addr, enum reg src)
 }
 
 static size_t
-mov_m32_r32(struct data *text, uint64_t addr, enum reg src)
+mov_m32_r32(struct data *const text, const uint64_t addr, const enum reg src)
 {
 	uint8_t temp;
 	if (text) {
@@ -243,7 +243,7 @@ mov_m32_r32(struct data *text, uint64_t addr, enum reg src)
 #define MOVE_TOREG 1
 
 static size_t
-_move_between_reg_and_memaddr_in_reg(struct data *text, enum reg reg, enum reg mem, uint8_t opsize, bool dir)
+_move_between_reg_and_memaddr_in_reg(struct data *const text, const enum reg reg, const enum reg mem, const uint8_t opsize, const bool dir)
 {
 	uint8_t temp, rex = opsize == 8 ? REX_W : 0;
 	rex |= (reg >= 8 ? REX_R : 0) | (mem >= 8 ? REX_B : 0);
@@ -265,55 +265,55 @@ _move_between_reg_and_memaddr_in_reg(struct data *text, enum reg reg, enum reg m
 }
 
 static size_t
-mov_mr64_r64(struct data *text, enum reg dest, enum reg src)
+mov_mr64_r64(struct data *const text, const enum reg dest, const enum reg src)
 {
 	return _move_between_reg_and_memaddr_in_reg(text, src, dest, 8, MOVE_FROMREG);
 }
 
 static size_t
-mov_mr32_r32(struct data *text, enum reg dest, enum reg src)
+mov_mr32_r32(struct data *const text, const enum reg dest, const enum reg src)
 {
 	return _move_between_reg_and_memaddr_in_reg(text, src, dest, 4, MOVE_FROMREG);
 }
 
 static size_t
-mov_mr16_r16(struct data *text, enum reg dest, enum reg src)
+mov_mr16_r16(struct data *const text, const enum reg dest, const enum reg src)
 {
 	return _move_between_reg_and_memaddr_in_reg(text, src, dest, 2, MOVE_FROMREG);
 }
 
 static size_t
-mov_mr8_r8(struct data *text, enum reg dest, enum reg src)
+mov_mr8_r8(struct data *const text, const enum reg dest, const enum reg src)
 {
 	return _move_between_reg_and_memaddr_in_reg(text, src, dest, 1, MOVE_FROMREG);
 }
 
 static size_t
-mov_r64_mr64(struct data *text, enum reg dest, enum reg src)
+mov_r64_mr64(struct data *const text, const enum reg dest, const enum reg src)
 {
 	return _move_between_reg_and_memaddr_in_reg(text, dest, src, 8, MOVE_TOREG);
 }
 
 static size_t
-mov_r32_mr32(struct data *text, enum reg dest, enum reg src)
+mov_r32_mr32(struct data *const text, const enum reg dest, const enum reg src)
 {
 	return _move_between_reg_and_memaddr_in_reg(text, dest, src, 4, MOVE_TOREG);
 }
 
 static size_t
-mov_r16_mr16(struct data *text, enum reg dest, enum reg src)
+mov_r16_mr16(struct data *const text, const enum reg dest, const enum reg src)
 {
 	return _move_between_reg_and_memaddr_in_reg(text, dest, src, 2, MOVE_TOREG);
 }
 
 static size_t
-mov_r8_mr8(struct data *text, enum reg dest, enum reg src)
+mov_r8_mr8(struct data *const text, const enum reg dest, const enum reg src)
 {
 	return _move_between_reg_and_memaddr_in_reg(text, dest, src, 1, MOVE_TOREG);
 }
 
 static size_t
-_move_between_reg_and_reg(struct data *text, enum reg dest, enum reg src, uint8_t opsize)
+_move_between_reg_and_reg(struct data *const text, const enum reg dest, const enum reg src, const uint8_t opsize)
 {
 	uint8_t temp, rex = (src >= 8 ? REX_R : 0) | (dest >= 8 ? REX_B : 0) | (opsize == 8 ? REX_W : 0);
 	if (text) {
@@ -331,31 +331,31 @@ _move_between_reg_and_reg(struct data *text, enum reg dest, enum reg src, uint8_
 }
 
 static size_t
-mov_r64_r64(struct data *text, enum reg dest, enum reg src)
+mov_r64_r64(struct data *const text, const enum reg dest, const enum reg src)
 {
 	return _move_between_reg_and_reg(text, dest, src, 8);
 }
 
 static size_t
-mov_r32_r32(struct data *text, enum reg dest, enum reg src)
+mov_r32_r32(struct data *const text, const enum reg dest, const enum reg src)
 {
 	return _move_between_reg_and_reg(text, dest, src, 4);
 }
 
 static size_t
-mov_r16_r16(struct data *text, enum reg dest, enum reg src)
+mov_r16_r16(struct data *const text, const enum reg dest, const enum reg src)
 {
 	return _move_between_reg_and_reg(text, dest, src, 2);
 }
 
 static size_t
-mov_r8_r8(struct data *text, enum reg dest, enum reg src)
+mov_r8_r8(struct data *const text, const enum reg dest, const enum reg src)
 {
 	return _move_between_reg_and_reg(text, dest, src, 1);
 }
 
 static size_t
-_move_between_reg_and_memaddr_in_reg_with_disp(struct data *text, enum reg reg, enum reg mem, int8_t disp, uint8_t opsize, bool dir)
+_move_between_reg_and_memaddr_in_reg_with_disp(struct data *const text, const enum reg reg, const enum reg mem, const int8_t disp, const uint8_t opsize, const bool dir)
 {
 	assert((reg & 7) != 4 && (mem & 7) != 4);
 	uint8_t temp, rex = opsize == 8 ? REX_W : 0;
@@ -379,55 +379,55 @@ _move_between_reg_and_memaddr_in_reg_with_disp(struct data *text, enum reg reg, 
 }
 
 static size_t
-mov_disp8_m64_r64(struct data *text, enum reg dest, int8_t disp, enum reg src)
+mov_disp8_m64_r64(struct data *const text, const enum reg dest, const int8_t disp, const enum reg src)
 {
 	return _move_between_reg_and_memaddr_in_reg_with_disp(text, src, dest, disp, 8, MOVE_FROMREG);
 }
 
 static size_t
-mov_disp8_m32_r32(struct data *text, enum reg dest, int8_t disp, enum reg src)
+mov_disp8_m32_r32(struct data *const text, const enum reg dest, const int8_t disp, const enum reg src)
 {
 	return _move_between_reg_and_memaddr_in_reg_with_disp(text, src, dest, disp, 4, MOVE_FROMREG);
 }
 
 static size_t
-mov_disp8_m16_r16(struct data *text, enum reg dest, int8_t disp, enum reg src)
+mov_disp8_m16_r16(struct data *const text, const enum reg dest, const int8_t disp, const enum reg src)
 {
 	return _move_between_reg_and_memaddr_in_reg_with_disp(text, src, dest, disp, 2, MOVE_FROMREG);
 }
 
 static size_t
-mov_disp8_m8_r8(struct data *text, enum reg dest, int8_t disp, enum reg src)
+mov_disp8_m8_r8(struct data *const text, const enum reg dest, const int8_t disp, const enum reg src)
 {
 	return _move_between_reg_and_memaddr_in_reg_with_disp(text, src, dest, disp, 1, MOVE_FROMREG);
 }
 
 static size_t
-mov_disp8_r64_m64(struct data *text, enum reg dest, enum reg src, int8_t disp)
+mov_disp8_r64_m64(struct data *const text, const enum reg dest, const enum reg src, const int8_t disp)
 {
 	return _move_between_reg_and_memaddr_in_reg_with_disp(text, dest, src, disp, 8, MOVE_TOREG);
 }
 
 static size_t
-mov_disp8_r32_m32(struct data *text, enum reg dest, enum reg src, int8_t disp)
+mov_disp8_r32_m32(struct data *const text, const enum reg dest, const enum reg src, const int8_t disp)
 {
 	return _move_between_reg_and_memaddr_in_reg_with_disp(text, dest, src, disp, 4, MOVE_TOREG);
 }
 
 static size_t
-mov_disp8_r16_m16(struct data *text, enum reg dest, enum reg src, int8_t disp)
+mov_disp8_r16_m16(struct data *const text, const enum reg dest, const enum reg src, const int8_t disp)
 {
 	return _move_between_reg_and_memaddr_in_reg_with_disp(text, dest, src, disp, 2, MOVE_TOREG);
 }
 
 static size_t
-mov_disp8_r8_m8(struct data *text, enum reg dest, enum reg src, int8_t disp)
+mov_disp8_r8_m8(struct data *const text, const enum reg dest, const enum reg src, const int8_t disp)
 {
 	return _move_between_reg_and_memaddr_in_reg_with_disp(text, dest, src, disp, 1, MOVE_TOREG);
 }
 
 static size_t
-_movezx_reg_to_reg(struct data *text, uint8_t destsize, uint8_t srcsize, enum reg dest, enum reg src)
+_movezx_reg_to_reg(struct data *const text, const uint8_t destsize, const uint8_t srcsize, const enum reg dest, const enum reg src)
 {
 	assert(srcsize == 1 || srcsize == 2);
 	assert(destsize == 1 || destsize == 2 || destsize == 4 || destsize == 8);
@@ -449,37 +449,37 @@ _movezx_reg_to_reg(struct data *text, uint8_t destsize, uint8_t srcsize, enum re
 }
 
 static size_t
-movzx_r64_r8(struct data *text, enum reg dest, enum reg src)
+movzx_r64_r8(struct data *const text, const enum reg dest, const enum reg src)
 {
 	return _movezx_reg_to_reg(text, 8, 1, dest, src);
 }
 
 static size_t
-movzx_r32_r8(struct data *text, enum reg dest, enum reg src)
+movzx_r32_r8(struct data *const text, const enum reg dest, const enum reg src)
 {
 	return _movezx_reg_to_reg(text, 4, 1, dest, src);
 }
 
 static size_t
-movzx_r16_r8(struct data *text, enum reg dest, enum reg src)
+movzx_r16_r8(struct data *const text, const enum reg dest, const enum reg src)
 {
 	return _movezx_reg_to_reg(text, 2, 1, dest, src);
 }
 
 static size_t
-movzx_r64_r16(struct data *text, enum reg dest, enum reg src)
+movzx_r64_r16(struct data *const text, const enum reg dest, const enum reg src)
 {
 	return _movezx_reg_to_reg(text, 8, 2, dest, src);
 }
 
 static size_t
-movzx_r32_r16(struct data *text, enum reg dest, enum reg src)
+movzx_r32_r16(struct data *const text, const enum reg dest, const enum reg src)
 {
 	return _movezx_reg_to_reg(text, 4, 2, dest, src);
 }
 
 static size_t
-lea_disp8(struct data *text, enum reg dest, enum reg src, int8_t disp)
+lea_disp8(struct data *const text, const enum reg dest, const enum reg src, const int8_t disp)
 {
 	uint8_t temp;
 	assert(src != 4);
@@ -494,7 +494,7 @@ lea_disp8(struct data *text, enum reg dest, enum reg src, int8_t disp)
 }
 
 static size_t
-add_r64_r64(struct data *text, enum reg dest, enum reg src)
+add_r64_r64(struct data *const text, const enum reg dest, const enum reg src)
 {
 	uint8_t temp;
 	if (text) {
@@ -507,7 +507,7 @@ add_r64_r64(struct data *text, enum reg dest, enum reg src)
 }
 
 static size_t
-sub_r64_r64(struct data *text, enum reg dest, enum reg src)
+sub_r64_r64(struct data *const text, const enum reg dest, const enum reg src)
 {
 	uint8_t temp;
 	if (text) {
@@ -520,7 +520,7 @@ sub_r64_r64(struct data *text, enum reg dest, enum reg src)
 }
 
 static size_t
-sub_r64_imm(struct data *text, enum reg dest, int32_t imm)
+sub_r64_imm(struct data *const text, const enum reg dest, int32_t imm)
 {
 	uint8_t temp;
 	if (text) {
@@ -537,7 +537,7 @@ sub_r64_imm(struct data *text, enum reg dest, int32_t imm)
 }
 
 static size_t
-_cmp_reg_to_reg(struct data *text, uint8_t size, enum reg reg1, enum reg reg2)
+_cmp_reg_to_reg(struct data *const text, const uint8_t size, const enum reg reg1, const enum reg reg2)
 {
 	uint8_t temp;
 	uint8_t rex = (size == 8 ? REX_W : 0) | (reg1 >= 8 ? REX_R : 0) | (reg2 >= 8 ? REX_B : 0);
@@ -556,31 +556,31 @@ _cmp_reg_to_reg(struct data *text, uint8_t size, enum reg reg1, enum reg reg2)
 }
 
 static size_t
-cmp_r64_r64(struct data *text, enum reg reg1, enum reg reg2)
+cmp_r64_r64(struct data *const text, const enum reg reg1, const enum reg reg2)
 {
 	return _cmp_reg_to_reg(text, 8, reg1, reg2);
 }
 
 static size_t
-cmp_r32_r32(struct data *text, enum reg reg1, enum reg reg2)
+cmp_r32_r32(struct data *const text, const enum reg reg1, const enum reg reg2)
 {
 	return _cmp_reg_to_reg(text, 4, reg1, reg2);
 }
 
 static size_t
-cmp_r16_r16(struct data *text, enum reg reg1, enum reg reg2)
+cmp_r16_r16(struct data *const text, const enum reg reg1, const enum reg reg2)
 {
 	return _cmp_reg_to_reg(text, 2, reg1, reg2);
 }
 
 static size_t
-cmp_r8_r8(struct data *text, enum reg reg1, enum reg reg2)
+cmp_r8_r8(struct data *const text, const enum reg reg1, const enum reg reg2)
 {
 	return _cmp_reg_to_reg(text, 1, reg1, reg2);
 }
 
 static size_t
-cmp_r8_imm(struct data *text, enum reg reg, uint8_t imm)
+cmp_r8_imm(struct data *const text, const enum reg reg, const uint8_t imm)
 {
 	uint8_t temp;
 	if (text) {
@@ -595,7 +595,7 @@ cmp_r8_imm(struct data *text, enum reg reg, uint8_t imm)
 }
 
 static size_t
-jng(struct data *text, int64_t offset)
+jng(struct data *const text, const int64_t offset)
 {
 	uint8_t temp;
 	if (-256 <= offset && offset <= 255) {
@@ -613,7 +613,7 @@ jng(struct data *text, int64_t offset)
 }
 
 static size_t
-jg(struct data *text, int64_t offset)
+jg(struct data *const text, const int64_t offset)
 {
 	uint8_t temp;
 	if (-256 <= offset && offset <= 255) {
@@ -631,7 +631,7 @@ jg(struct data *text, int64_t offset)
 }
 
 static size_t
-jne(struct data *text, int64_t offset)
+jne(struct data *const text, const int64_t offset)
 {
 	uint8_t temp;
 	if (-256 <= offset && offset <= 255) {
@@ -649,7 +649,7 @@ jne(struct data *text, int64_t offset)
 }
 
 static size_t
-je(struct data *text, int64_t offset)
+je(struct data *const text, const int64_t offset)
 {
 	uint8_t temp;
 	if (-128 <= offset && offset <= 127) {
@@ -678,7 +678,7 @@ je(struct data *text, int64_t offset)
 }
 
 static size_t
-sete_reg(struct data *text, enum reg reg)
+sete_reg(struct data *const text, const enum reg reg)
 {
 	uint8_t temp;
 	if (text) {
@@ -692,7 +692,7 @@ sete_reg(struct data *text, enum reg reg)
 }
 
 static size_t
-setne_reg(struct data *text, enum reg reg)
+setne_reg(struct data *const text, const enum reg reg)
 {
 	uint8_t temp;
 	if (text) {
@@ -706,7 +706,7 @@ setne_reg(struct data *text, enum reg reg)
 }
 
 static size_t
-jmp(struct data *text, int64_t offset)
+jmp(struct data *const text, const int64_t offset)
 {
 	uint8_t temp;
 	if (-256 <= offset && offset <= 255) {
@@ -724,7 +724,7 @@ jmp(struct data *text, int64_t offset)
 }
 
 static size_t
-call(struct data *text, int32_t offset)
+call(struct data *const text, const int32_t offset)
 {
 	uint8_t temp;
 	if (text) {
@@ -739,7 +739,7 @@ call(struct data *text, int32_t offset)
 }
 
 static size_t
-ret(struct data *text)
+ret(struct data *const text)
 {
 	uint8_t temp;
 	if (text)
@@ -749,7 +749,7 @@ ret(struct data *text)
 }
 
 static size_t
-_pushpop_r64(struct data *text, uint8_t ioff, enum reg reg)
+_pushpop_r64(struct data *const text, const uint8_t ioff, const enum reg reg)
 {
 	uint8_t temp;
 	if (text) {
@@ -763,19 +763,19 @@ _pushpop_r64(struct data *text, uint8_t ioff, enum reg reg)
 }
 
 static size_t
-push_r64(struct data *text, enum reg reg)
+push_r64(struct data *const text, const enum reg reg)
 {
 	return _pushpop_r64(text, 0, reg);
 }
 
 static size_t
-pop_r64(struct data *text, enum reg reg)
+pop_r64(struct data *const text, const enum reg reg)
 {
 	return _pushpop_r64(text, 8, reg);
 }
 
-static size_t emitsyscall(struct data *text, uint8_t paramcount);
-static size_t emitproc(struct data *text, struct iproc *proc);
+static size_t emitsyscall(struct data *const text, const uint8_t paramcount);
+static size_t emitproc(struct data *const text, const struct iproc *const proc);
 
 const struct target x64_target = {
 	.reserved = (1 << RSP) | (1 << RBP) | (1 << R12) | (1 << R13),
@@ -786,7 +786,7 @@ const struct target x64_target = {
 #define NEXT ins++; assert(ins <= end);
 
 static size_t
-emitsyscall(struct data *text, uint8_t paramcount)
+emitsyscall(struct data *const text, const uint8_t paramcount)
 {
 	assert(paramcount < 8);
 	size_t total = 0;
@@ -820,9 +820,9 @@ emitsyscall(struct data *text, uint8_t paramcount)
 }
 
 size_t
-emitblock(struct data *text, struct iproc *proc, struct instr *start, struct instr *end, uint16_t active, uint16_t curi)
+emitblock(struct data *const text, const struct iproc *const proc, const struct instr *const start, const struct instr *end, uint16_t active, uint16_t curi)
 {
-	struct instr *ins = start ? start : proc->data;
+	const struct instr *ins = start ? start : proc->data;
 	end = end ? end : &proc->data[proc->len];
 
 	uint64_t dest, src, size, count, label;
@@ -1061,7 +1061,7 @@ emitblock(struct data *text, struct iproc *proc, struct instr *start, struct ins
 }
 
 size_t
-emitproc(struct data *text, struct iproc *proc)
+emitproc(struct data *const text, const struct iproc *const proc)
 {
 	return emitblock(text, proc, NULL, NULL, 0, 0);
 }

@@ -48,17 +48,17 @@ regalloc()
 }
 
 static void
-regfree(uint8_t reg)
+regfree(const uint8_t reg)
 {
 	assert(regs & (1 << reg));
 	regs &= ~(1 << reg);
 }
 
 static void
-genblock(struct iproc *out, struct block *block);
+genblock(struct iproc *const out, const struct block *const block);
 
 static uint64_t
-procindex(struct slice *s)
+procindex(const struct slice *const s)
 {
 	for (size_t i = 0; i < toplevel.code.len; i++) {
 		struct iproc *iproc = &toplevel.code.data[i];
@@ -71,7 +71,7 @@ procindex(struct slice *s)
 }
 
 static void
-putins(struct iproc *out, int op, uint64_t val, int valtype)
+putins(struct iproc *const out, const int op, const uint64_t val, const int valtype)
 {
 	assert(op);
 	assert(valtype);
@@ -145,7 +145,7 @@ putins(struct iproc *out, int op, uint64_t val, int valtype)
 }
 
 static uint64_t
-bumplabel(struct iproc *out)
+bumplabel(struct iproc *const out)
 {
 	uint64_t temp;
 	array_addlit((&out->labels), 0);
@@ -153,7 +153,7 @@ bumplabel(struct iproc *out)
 }
 
 static size_t
-assign(struct iproc *out, uint8_t size)
+assign(struct iproc *const out, const uint8_t size)
 {
 	size_t t = NEWTMP;
 	STARTINS(IR_ASSIGN, t, VT_TEMP);
@@ -162,7 +162,7 @@ assign(struct iproc *out, uint8_t size)
 }
 
 static size_t
-immediate(struct iproc *out, uint8_t size, uint64_t val)
+immediate(struct iproc *const out, const uint8_t size, const uint64_t val)
 {
 	size_t t = assign(out, size);
 	putins(out, IR_IMM, val, VT_IMM);
@@ -170,7 +170,7 @@ immediate(struct iproc *out, uint8_t size, uint64_t val)
 }
 
 static size_t
-load(struct iproc *out, uint8_t size, uint64_t index)
+load(struct iproc *const out, const uint8_t size, const uint64_t index)
 {
 	size_t t = assign(out, size);;
 	putins(out, IR_LOAD, index, VT_TEMP);
@@ -178,7 +178,7 @@ load(struct iproc *out, uint8_t size, uint64_t index)
 }
 
 static size_t
-alloc(struct iproc *out, uint8_t size, uint64_t count)
+alloc(struct iproc *const out, const uint8_t size, const uint64_t count)
 {
 	size_t t = assign(out, size);
 	out->temps.data[t].flags = TF_PTR;
@@ -187,14 +187,14 @@ alloc(struct iproc *out, uint8_t size, uint64_t count)
 }
 
 static void
-store(struct iproc *out, uint8_t size, uint64_t src, uint64_t dest)
+store(struct iproc *const out, const uint8_t size, const uint64_t src, const uint64_t dest)
 {
 	STARTINS(IR_STORE, src, VT_TEMP);
 	putins(out, IR_EXTRA, dest, VT_TEMP);
 }
 
 static int
-genexpr(struct iproc *out, size_t expri, uint64_t *val)
+genexpr(struct iproc *const out, const size_t expri, uint64_t *const val)
 {
 	struct expr *expr = &exprs.data[expri];
 	uint64_t temp2 = 0;
@@ -364,7 +364,7 @@ genexpr(struct iproc *out, size_t expri, uint64_t *val)
 }
 
 static void
-genassign(struct iproc *out, struct decl *decl, size_t val)
+genassign(struct iproc *const out, const struct decl *const decl, const size_t val)
 {
 	struct type *type = &types.data[decl->type];
 	uint64_t what;
@@ -388,7 +388,7 @@ genassign(struct iproc *out, struct decl *decl, size_t val)
 }
 
 static void
-genblock(struct iproc *out, struct block *block)
+genblock(struct iproc *const out, const struct block *const block)
 {
 	struct decl *decl;
 	struct type *type;
@@ -431,7 +431,7 @@ genblock(struct iproc *out, struct block *block)
 }
 
 static void
-chooseregs(struct iproc *proc)
+chooseregs(struct iproc *const proc)
 {
 	bool active[proc->temps.len];
 	memset(active, 0, proc->temps.len * sizeof(*active));
@@ -466,7 +466,7 @@ chooseregs(struct iproc *proc)
 }
 
 size_t
-genproc(struct decl *decl, struct proc *proc)
+genproc(struct decl *const decl, const struct proc *const proc)
 {
 	tmpi = labeli = curi = 1;
 	rblocki = reali = 0;

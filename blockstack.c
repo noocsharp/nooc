@@ -6,11 +6,11 @@
 #include "ir.h"
 #include "util.h"
 
-struct block *blockstack[BLOCKSTACKSIZE];
+const struct block *blockstack[BLOCKSTACKSIZE];
 size_t blocki;
 
 void
-blockpush(struct block *block)
+blockpush(const struct block *const block)
 {
 	if (blocki >= BLOCKSTACKSIZE - 1)
 		die("blockpush: too many blocks!");
@@ -19,7 +19,7 @@ blockpush(struct block *block)
 	blocki++;
 }
 
-struct block *
+const struct block *const
 blockpop()
 {
 	if (blocki == 0)
@@ -29,7 +29,7 @@ blockpop()
 	return blockstack[blocki];
 }
 
-struct block *
+const struct block *const
 blockpeek()
 {
 	if (blocki == 0)

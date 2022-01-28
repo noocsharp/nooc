@@ -22,13 +22,13 @@ extern struct exprs exprs;
 extern struct types types;
 extern struct map *typesmap;
 
-struct token *tok;
+const struct token *tok;
 
-static void parsenametypes(struct nametypes *nametypes);
+static void parsenametypes(struct nametypes *const nametypes);
 static size_t parsetype();
 
 struct decl *
-finddecl(struct slice s)
+finddecl(const struct slice s)
 {
 	for (int j = blocki - 1; j >= 0; j--) {
 		for (int i = 0; i < blockstack[j]->decls.len; i++) {
@@ -43,7 +43,7 @@ finddecl(struct slice s)
 }
 
 static void
-expect(enum tokentype type)
+expect(const enum tokentype type)
 {
 	if (!tok)
 		error(tok->line, tok->col, "unexpected null token!");
@@ -53,7 +53,7 @@ expect(enum tokentype type)
 }
 
 static void
-parsestring(struct expr *expr)
+parsestring(struct expr *const expr)
 {
 	expr->start = tok;
 	expr->kind = EXPR_LIT;
@@ -89,7 +89,7 @@ parsestring(struct expr *expr)
 }
 
 static void
-parsenum(struct expr *expr)
+parsenum(struct expr *const expr)
 {
 	expr->start = tok;
 	expr->kind = EXPR_LIT;
@@ -110,7 +110,7 @@ parsenum(struct expr *expr)
 }
 
 enum class
-typetoclass(struct type *type)
+typetoclass(const struct type *const type)
 {
 	switch (type->class) {
 	case TYPE_INT:
@@ -126,10 +126,10 @@ typetoclass(struct type *type)
 	return 0; // warning
 }
 
-static void parseblock(struct block *block);
+static void parseblock(struct block *const block);
 
 static size_t
-parseexpr(struct block *block)
+parseexpr(struct block *const block)
 {
 	struct expr expr = { 0 };
 	switch (tok->type) {
@@ -300,7 +300,7 @@ binary_common:
 }
 
 void
-parsetypelist(struct typelist *list)
+parsetypelist(struct typelist *const list)
 {
 	expect(TOK_LPAREN);
 	tok = tok->next;
@@ -371,7 +371,7 @@ parsetype()
 }
 
 static void
-parsenametypes(struct nametypes *nametypes)
+parsenametypes(struct nametypes *const nametypes)
 {
 	expect(TOK_LPAREN);
 	tok = tok->next;
@@ -398,7 +398,7 @@ parsenametypes(struct nametypes *nametypes)
 }
 
 static void
-parseblock(struct block *block)
+parseblock(struct block *const block)
 {
 	struct statement statement;
 	bool curlies = false;
@@ -469,7 +469,7 @@ parseblock(struct block *block)
 }
 
 struct block
-parse(struct token *start)
+parse(const struct token *const start)
 {
 	tok = start;
 	struct block block = { 0 };

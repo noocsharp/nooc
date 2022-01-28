@@ -70,7 +70,7 @@ inittypes()
 }
 
 static void
-hashtype(struct type *type, uint8_t *out)
+hashtype(const struct type *const type, uint8_t *const out)
 {
 	static bool empty_found = false;
 	struct blake3 b3;
@@ -100,8 +100,8 @@ hashtype(struct type *type, uint8_t *out)
 	blake3_out(&b3, out, 16);
 }
 
-static size_t
-getindex(uint8_t hash[16])
+static const size_t
+getindex(const uint8_t hash[16])
 {
 	uint64_t i = hash[0] & (table.cap - 1);
 	while (table.keys[i].present && memcmp(table.keys[i].hash, hash, 16)) {
@@ -111,23 +111,23 @@ getindex(uint8_t hash[16])
 	return i;
 }
 
-size_t
-type_query(struct type *type)
+const size_t
+type_query(const struct type *const type)
 {
 	uint8_t hash[16];
 	hashtype(type, hash);
 	return type_get(hash);
 }
 
-size_t
-type_get(uint8_t hash[16])
+const size_t
+type_get(const uint8_t hash[16])
 {
 	size_t i = getindex(hash);
 	return table.keys[i].present ? table.vals[i] : 0;
 }
 
-size_t
-type_put(struct type *type)
+const size_t
+type_put(const struct type *const type)
 {
 	struct typekey *oldkeys;
 	size_t *oldvals, oldcap, i, j;
@@ -166,7 +166,7 @@ type_put(struct type *type)
 }
 
 void
-typecompat(size_t typei, size_t expri)
+typecompat(const size_t typei, const size_t expri)
 {
 	struct type *type = &types.data[typei];
 	struct expr *expr = &exprs.data[expri];
@@ -201,8 +201,8 @@ typecompat(size_t typei, size_t expri)
 	}
 }
 
-size_t
-typeref(size_t typei)
+const size_t
+typeref(const size_t typei)
 {
 	struct type ref = {
 		.class = TYPE_REF,
@@ -214,7 +214,7 @@ typeref(size_t typei)
 }
 
 static void
-typecheckcall(struct expr *expr)
+typecheckcall(const struct expr *const expr)
 {
 	assert(expr->kind == EXPR_FCALL);
 	struct decl *fdecl = finddecl(expr->d.call.name);
@@ -238,7 +238,7 @@ typecheckcall(struct expr *expr)
 }
 
 static void
-typecheckexpr(size_t expri)
+typecheckexpr(const size_t expri)
 {
 	struct expr *expr = &exprs.data[expri];
 	switch (expr->kind) {
@@ -266,10 +266,10 @@ typecheckexpr(size_t expri)
 }
 
 void
-typecheck(struct block *block)
+typecheck(const struct block *const block)
 {
 	for (size_t i = 0; i < block->len; i++) {
-		struct statement *statement = &block->data[i];
+		const struct statement *const statement = &block->data[i];
 		struct decl *decl;
 		struct assgn *assgn;
 		switch (block->data[i].kind) {

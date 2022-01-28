@@ -6,7 +6,7 @@
 #include "elf.h"
 
 void
-elf(size_t entry, struct data *text, struct data *data, FILE *f)
+elf(const size_t entry, const struct data *const text, const struct data *const data, FILE *const f)
 {
 	Elf64_Ehdr ehdr = { 0 };
 	Elf64_Phdr phdr_text = { 0 };
