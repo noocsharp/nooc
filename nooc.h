@@ -222,6 +222,7 @@ enum exprkind {
 
 enum class {
 	C_INT = 1,
+	C_BOOL,
 	C_REF,
 	C_STR,
 	C_PROC,

@@ -144,6 +144,8 @@ parseexpr(struct block *block)
 		expr.kind = EXPR_COND;
 		tok = tok->next;
 		expr.d.cond.cond = parseexpr(block);
+		if (exprs.data[expr.d.cond.cond].class != C_BOOL)
+			error(expr.start->line, expr.start->col, "expected boolean expression for if condition");
 		parseblock(&expr.d.cond.bif);
 		if (tok->type == TOK_ELSE) {
 			tok = tok->next;
@@ -238,11 +240,19 @@ parseexpr(struct block *block)
 	case TOK_EQUAL:
 		expr.kind = EXPR_BINARY;
 		expr.d.bop.kind = BOP_EQUAL;
-		goto binary_common;
+		goto bool_common;
 	case TOK_GREATER:
 		expr.kind = EXPR_BINARY;
 		expr.d.bop.kind = BOP_GREATER;
-		goto binary_common;
+bool_common:
+		expr.start = tok;
+		tok = tok->next;
+		expr.d.bop.left = parseexpr(block);
+		expr.d.bop.right = parseexpr(block);
+		if (exprs.data[expr.d.bop.left].class != exprs.data[expr.d.bop.right].class)
+			error(tok->line, tok->col, "expected boolean expression operands to be of same class");
+		expr.class = C_BOOL;
+		break;
 	case TOK_PLUS:
 		expr.kind = EXPR_BINARY;
 		expr.d.bop.kind = BOP_PLUS;
