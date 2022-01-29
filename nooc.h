@@ -251,3 +251,12 @@ struct exprs {
 	size_t len;
 	struct expr *data;
 };
+
+extern const char *const tokenstr[];
+extern struct assgns assgns;
+extern struct exprs exprs;
+extern struct target targ;
+extern struct toplevel toplevel;
+extern struct map *typesmap;
+extern char *infile;
+extern struct types types;

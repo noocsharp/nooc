@@ -12,11 +12,7 @@
 #include "ir.h"
 #include "util.h"
 #include "blockstack.h"
-
-extern struct types types;
-extern struct exprs exprs;
-extern struct assgns assgns;
-extern struct toplevel toplevel;
+#include "target.h"
 
 #define STARTINS(op, val, valtype) putins((out), (op), (val), (valtype)) ; curi++ ;
 #define LABEL(l) out->labels.data[l] = reali; STARTINS(IR_LABEL, l, VT_LABEL);
@@ -25,13 +21,8 @@ extern struct toplevel toplevel;
 
 #define PTRSIZE 8
 
-extern struct target targ;
-
-static uint64_t tmpi, labeli, curi, reali, rblocki;
-static struct temp interval;
+static uint64_t tmpi, labeli, curi, reali, rblocki, out_index;
 static uint16_t regs; // used register bitfield
-
-uint64_t out_index;
 
 static uint8_t
 regalloc()
@@ -61,7 +52,7 @@ static uint64_t
 procindex(const struct slice *const s)
 {
 	for (size_t i = 0; i < toplevel.code.len; i++) {
-		struct iproc *iproc = &toplevel.code.data[i];
+		const struct iproc *const iproc = &toplevel.code.data[i];
 		if (slice_cmp(s, &iproc->s) == 0)
 			return i;
 	}
@@ -75,7 +66,7 @@ putins(struct iproc *const out, const int op, const uint64_t val, const int valt
 {
 	assert(op);
 	assert(valtype);
-	struct instr ins = {
+	const struct instr ins = {
 		.val = val,
 		.op = op,
 		.valtype = valtype
@@ -480,7 +471,10 @@ genproc(struct decl *const decl, const struct proc *const proc)
 	struct iproc *out = &iproc; // for macros to work, a bit hacky
 
 	// put a blank interval, since tmpi starts at 1
-	array_add((&iproc.temps), interval);
+	{
+		struct temp temp = { 0 };
+		array_add((&iproc.temps), temp);
+	}
 	array_add((&iproc.labels), labeli);
 
 	size_t startlabel = bumplabel(out), endlabel = bumplabel(out);

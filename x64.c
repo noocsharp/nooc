@@ -8,6 +8,7 @@
 #include "ir.h"
 #include "util.h"
 #include "array.h"
+#include "target.h"
 
 enum reg {
 	RAX,
@@ -46,8 +47,6 @@ enum mod {
 
 char abi_arg[] = {RAX, RDI, RSI, RDX, R10, R8, R9};
 unsigned short used_reg;
-
-extern struct toplevel toplevel;
 
 static size_t
 add_r64_imm(struct data *const text, const enum reg dest, const uint64_t imm)

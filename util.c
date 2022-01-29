@@ -10,9 +10,6 @@
 #include "array.h"
 #include "util.h"
 
-extern char *infile;
-extern struct exprs exprs;
-
 const char *const tokenstr[] = {
 	[TOK_NONE] = "TOK_NONE",
 	[TOK_NAME] = "TOK_NAME",

@@ -12,16 +12,6 @@
 #include "map.h"
 #include "blockstack.h"
 
-extern struct block *blockstack[BLOCKSTACKSIZE];
-extern size_t blocki;
-
-extern const char *const tokenstr[];
-
-extern struct assgns assgns;
-extern struct exprs exprs;
-extern struct types types;
-extern struct map *typesmap;
-
 const struct token *tok;
 
 static void parsenametypes(struct nametypes *const nametypes);
@@ -427,7 +417,6 @@ parseblock(struct block *const block)
 			expect(TOK_EQUAL);
 			tok = tok->next;
 
-			// FIXME: scoping
 			if (finddecl(decl.s)) {
 				error(tok->line, tok->col, "repeat declaration!");
 			}

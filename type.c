@@ -16,9 +16,6 @@
 // hashtable based on cproc's map.c
 
 struct types types;
-extern struct map *typesmap;
-extern struct assgns assgns;
-extern struct exprs exprs;
 
 static struct typetable {
 	size_t cap, count;

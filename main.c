@@ -19,22 +19,13 @@
 #include "type.h"
 #include "map.h"
 #include "blockstack.h"
+#include "target.h"
 
-extern const char *const tokenstr[];
-
-extern struct block *blockstack[BLOCKSTACKSIZE];
-extern size_t blocki;
-
-struct map *typesmap;
 struct assgns assgns;
 struct exprs exprs;
-extern struct types types;
-
-extern const struct target x64_target;
 struct target targ;
-
 struct toplevel toplevel;
-
+struct map *typesmap;
 char *infile;
 
 uint64_t

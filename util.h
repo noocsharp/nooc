@@ -10,3 +10,5 @@ void die(const char *const error);
 void *xmalloc(size_t size);
 void *xrealloc(void *, size_t);
 void *xcalloc(size_t, size_t);
+
+extern const char *const tokenstr[];
