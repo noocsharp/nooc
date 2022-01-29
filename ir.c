@@ -20,28 +20,6 @@
 #define PTRSIZE 8
 
 static uint64_t tmpi, labeli, curi, reali, rblocki, out_index;
-static uint16_t regs; // used register bitfield
-
-static uint8_t
-regalloc()
-{
-	int free = ffs(~regs);
-	if (!free)
-		die("out of registers!");
-
-	// the nth register being free corresponds to shifting by n-1
-	free--;
-	regs |= (1 << free);
-
-	return free;
-}
-
-static void
-regfree(const uint8_t reg)
-{
-	assert(regs & (1 << reg));
-	regs &= ~(1 << reg);
-}
 
 static void
 genblock(struct iproc *const out, const struct block *const block);
@@ -420,9 +398,10 @@ genblock(struct iproc *const out, const struct block *const block)
 }
 
 static void
-chooseregs(struct iproc *const proc)
+chooseregs(const struct iproc *const proc)
 {
 	bool active[proc->temps.len];
+	uint16_t regs = targ.reserved;
 	memset(active, 0, proc->temps.len * sizeof(*active));
 
 	// FIXME: can this happen in the generation loop?
@@ -442,12 +421,21 @@ chooseregs(struct iproc *const proc)
 		for (size_t j = 0; j < proc->temps.len; j++) {
 			if (active[j] && proc->temps.data[j].end == i - 1) {
 				active[j] = false;
-				regfree(proc->temps.data[j].reg);
+				assert(regs & (1 << proc->temps.data[j].reg));
+				regs &= ~(1 << proc->temps.data[j].reg);
 			}
 
 			if (!active[j] && proc->temps.data[j].start == i) {
 				active[j] = true;
-				proc->temps.data[j].reg = regalloc();
+				
+				int free = ffs(~regs);
+				if (!free)
+					die("out of registers!");
+
+				// the nth register being free corresponds to shifting by n-1
+				free--;
+				regs |= (1 << free);
+				proc->temps.data[j].reg = free;
 			}
 		}
 	}
@@ -459,7 +447,6 @@ genproc(struct decl *const decl, const struct proc *const proc)
 {
 	tmpi = labeli = curi = 1;
 	rblocki = reali = 0;
-	regs = targ.reserved;
 	struct type *type;
 	struct iproc iproc = {
 		.s = decl->s,
