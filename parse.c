@@ -374,20 +374,20 @@ static void
 parseblock(struct block *const block)
 {
 	struct statement statement;
-	bool curlies = false, toplevel_decl = blockpeek() == NULL;
+	bool toplevel = blockpeek() == NULL;
 
 	blockpush(block);
-	if (tok->type == TOK_LCURLY) {
-		curlies = true;
+	if (!toplevel) {
+		expect(TOK_LCURLY);
 		tok = tok->next;
 	}
 
-	while (!(tok->type == TOK_NONE || (curlies && tok->type == TOK_RCURLY))) {
+	while (!(tok->type == TOK_NONE || (!toplevel && tok->type == TOK_RCURLY))) {
 		statement = (struct statement){ 0 };
 		statement.start = tok;
 		if (tok->type == TOK_LET) {
 			struct decl decl = { 0 };
-			decl.toplevel = toplevel_decl;
+			decl.toplevel = toplevel;
 			decl.start = tok;
 			statement.kind = STMT_DECL;
 			tok = tok->next;
@@ -431,7 +431,7 @@ parseblock(struct block *const block)
 		}
 	}
 
-	if (curlies) {
+	if (!toplevel) {
 		expect(TOK_RCURLY);
 		tok = tok->next;
 	}

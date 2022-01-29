@@ -1,0 +1,1 @@
+let main proc() = proc() syscall2(60, 0)
