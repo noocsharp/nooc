@@ -9,6 +9,21 @@
 const struct block *blockstack[BLOCKSTACKSIZE];
 size_t blocki;
 
+struct decl *
+finddecl(const struct slice s)
+{
+	for (int j = blocki - 1; j >= 0; j--) {
+		for (int i = 0; i < blockstack[j]->decls.len; i++) {
+			struct decl *decl = &blockstack[j]->decls.data[i];
+			if (slice_cmp(&s, &decl->s) == 0) {
+				return decl;
+			}
+		}
+	}
+
+	return NULL;
+}
+
 void
 blockpush(const struct block *const block)
 {
@@ -33,7 +48,7 @@ const struct block *const
 blockpeek()
 {
 	if (blocki == 0)
-		die("blockpop: cannot peek empty stack!");
+		return NULL;
 
 	return blockstack[blocki - 1];
 }

@@ -240,7 +240,7 @@ slice_cmp(const struct slice *const s1, const struct slice *const s2)
 int
 slice_cmplit(const struct slice *const s1, const char *const s2)
 {
-	size_t len = strlen(s2);
+	const size_t len = strlen(s2);
 	if (s1->len < len)
 		return 1;
 

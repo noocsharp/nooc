@@ -5,13 +5,13 @@
 #include <string.h>
 
 #include "nooc.h"
-#include "parse.h"
 #include "ir.h"
 #include "util.h"
 #include "type.h"
 #include "map.h"
 #include "blake3.h"
 #include "array.h"
+#include "blockstack.h"
 
 // hashtable based on cproc's map.c
 
@@ -165,8 +165,8 @@ type_put(const struct type *const type)
 void
 typecompat(const size_t typei, const size_t expri)
 {
-	struct type *type = &types.data[typei];
-	struct expr *expr = &exprs.data[expri];
+	const struct type *const type = &types.data[typei];
+	const struct expr *const expr = &exprs.data[expri];
 
 	switch (type->class) {
 	case TYPE_INT:
@@ -201,7 +201,7 @@ typecompat(const size_t typei, const size_t expri)
 const size_t
 typeref(const size_t typei)
 {
-	struct type ref = {
+	const struct type ref = {
 		.class = TYPE_REF,
 		.size = 8,
 		.d.subtype = typei
@@ -214,30 +214,28 @@ static void
 typecheckcall(const struct expr *const expr)
 {
 	assert(expr->kind == EXPR_FCALL);
-	struct decl *fdecl = finddecl(expr->d.call.name);
+	const struct decl *const decl = finddecl(expr->d.call.name);
 
-	if (fdecl == NULL) {
-		if (slice_cmplit(&expr->d.call.name, "syscall") == 0) {
+	if (decl == NULL) {
+		if (slice_cmplit(&expr->d.call.name, "syscall") == 0)
 			return;
-		} else {
+		else
 			error(expr->start->line, expr->start->col, "unknown function '%.*s'", expr->d.call.name.len, expr->d.call.name.data);
-		}
 	}
 
-	struct type *ftype = &types.data[fdecl->type];
-	assert(ftype->class == TYPE_PROC);
+	const struct type *const type = &types.data[decl->type];
+	assert(type->class == TYPE_PROC);
 
 	// should this throw an error instead and we move the check out of parsing?
-	assert(expr->d.call.params.len == ftype->d.params.in.len);
-	for (int i = 0; i < ftype->d.params.in.len; i++) {
-		typecompat(ftype->d.params.in.data[i], expr->d.call.params.data[i]);
-	}
+	assert(expr->d.call.params.len == type->d.params.in.len);
+	for (int i = 0; i < type->d.params.in.len; i++)
+		typecompat(type->d.params.in.data[i], expr->d.call.params.data[i]);
 }
 
 static void
 typecheckexpr(const size_t expri)
 {
-	struct expr *expr = &exprs.data[expri];
+	const struct expr *const expr = &exprs.data[expri];
 	switch (expr->kind) {
 	case EXPR_BINARY:
 		typecheckexpr(expr->d.bop.left);
@@ -267,8 +265,8 @@ typecheck(const struct block *const block)
 {
 	for (size_t i = 0; i < block->len; i++) {
 		const struct statement *const statement = &block->data[i];
-		struct decl *decl;
-		struct assgn *assgn;
+		const struct decl *decl;
+		const struct assgn *assgn;
 		switch (block->data[i].kind) {
 		case STMT_ASSGN:
 			assgn = &assgns.data[statement->idx];
@@ -278,7 +276,7 @@ typecheck(const struct block *const block)
 
 			typecheckexpr(assgn->val);
 			if (decl->out) {
-				struct type *type = &types.data[decl->type];
+				const struct type *const type = &types.data[decl->type];
 				typecompat(type->d.subtype, assgn->val);
 			} else {
 				typecompat(decl->type, assgn->val);

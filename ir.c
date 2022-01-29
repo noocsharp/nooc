@@ -4,11 +4,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 
 #include "array.h"
 #include "nooc.h"
-#include "parse.h"
 #include "ir.h"
 #include "util.h"
 #include "blockstack.h"

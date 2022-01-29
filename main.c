@@ -4,7 +4,6 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -14,8 +13,6 @@
 #include "ir.h"
 #include "util.h"
 #include "elf.h"
-#include "lex.h"
-#include "parse.h"
 #include "type.h"
 #include "map.h"
 #include "blockstack.h"
@@ -27,6 +24,9 @@ struct target targ;
 struct toplevel toplevel;
 struct map *typesmap;
 char *infile;
+
+struct block parse(const struct token *const start);
+struct token *lex(struct slice start);
 
 uint64_t
 data_push(const char *const ptr, const size_t len)

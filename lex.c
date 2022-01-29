@@ -6,7 +6,6 @@
 #include "nooc.h"
 #include "ir.h"
 #include "util.h"
-#include "lex.h"
 
 #define ADVANCE(n) \
 			start.data += (n) ; \
@@ -18,9 +17,7 @@ lex(struct slice start)
 {
 	size_t line = 1;
 	size_t col = 1;
-	struct token *const head = calloc(1, sizeof(struct token));
-	if (!head)
-		return NULL;
+	struct token *const head = xcalloc(1, sizeof(struct token));
 
 	struct token *cur = head;
 	while (start.len) {
@@ -125,10 +122,7 @@ lex(struct slice start)
 			error(line, col, "invalid token");
 		}
 
-		cur->next = calloc(1, sizeof(struct token));
-
-		if (!cur->next)
-			die("lex: failed to allocate next token");
+		cur->next = xcalloc(1, sizeof(struct token));
 
 		cur = cur->next;
 	}

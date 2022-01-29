@@ -2,7 +2,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <strings.h>
 
 #include "nooc.h"
 #include "ir.h"

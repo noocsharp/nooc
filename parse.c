@@ -4,7 +4,6 @@
 #include <stdlib.h>
 
 #include "nooc.h"
-#include "parse.h"
 #include "ir.h"
 #include "util.h"
 #include "array.h"
@@ -12,25 +11,9 @@
 #include "map.h"
 #include "blockstack.h"
 
-const struct token *tok;
-
+static const struct token *tok;
 static void parsenametypes(struct nametypes *const nametypes);
 static size_t parsetype();
-
-struct decl *
-finddecl(const struct slice s)
-{
-	for (int j = blocki - 1; j >= 0; j--) {
-		for (int i = 0; i < blockstack[j]->decls.len; i++) {
-			struct decl *decl = &(blockstack[j]->decls.data[i]);
-			if (slice_cmp(&s, &decl->s) == 0) {
-				return decl;
-			}
-		}
-	}
-
-	return NULL;
-}
 
 static void
 expect(const enum tokentype type)
@@ -49,7 +32,7 @@ parsestring(struct expr *const expr)
 	expr->kind = EXPR_LIT;
 	expr->class = C_STR;
 	expr->d.v.v.s = (struct slice){ 0 };
-	struct slice str = tok->slice;
+	const struct slice str = tok->slice;
 	for (size_t i = 0; i < str.len; i++) {
 		switch (str.data[i]) {
 		case '\\':
@@ -99,7 +82,7 @@ parsenum(struct expr *const expr)
 	tok = tok->next;
 }
 
-enum class
+static enum class
 typetoclass(const struct type *const type)
 {
 	switch (type->class) {
@@ -122,6 +105,8 @@ static size_t
 parseexpr(struct block *const block)
 {
 	struct expr expr = { 0 };
+	const struct type *type;
+	const struct decl *decl;
 	switch (tok->type) {
 	case TOK_LOOP:
 		expr.start = tok;
@@ -148,13 +133,11 @@ parseexpr(struct block *const block)
 		expect(TOK_RPAREN);
 		tok = tok->next;
 		return ret;
-		break;
 	case TOK_NAME:
 		expr.start = tok;
 		// a procedure definition
 		if (slice_cmplit(&tok->slice, "proc") == 0) {
-			struct decl decl = { 0 };
-			struct type *type;
+			struct decl param = { 0 };
 			int8_t offset = 0;
 			expr.kind = EXPR_PROC;
 			expr.class = C_PROC;
@@ -164,46 +147,46 @@ parseexpr(struct block *const block)
 				parsenametypes(&expr.d.proc.out);
 
 			for (int i = expr.d.proc.in.len - 1; i >= 0; i--) {
-				decl.s = expr.d.proc.in.data[i].name;
-				decl.type = expr.d.proc.in.data[i].type;
-				decl.in = true;
-				type = &types.data[decl.type];
+				param.s = expr.d.proc.in.data[i].name;
+				param.type = expr.d.proc.in.data[i].type;
+				param.in = true;
+				type = &types.data[param.type];
 				offset += type->size;
-				array_add((&expr.d.proc.block.decls), decl);
+				array_add((&expr.d.proc.block.decls), param);
 			}
 
 			for (size_t i = 0; i < expr.d.proc.out.len; i++) {
-				decl.s = expr.d.proc.out.data[i].name;
-				decl.type = typeref(expr.d.proc.out.data[i].type);
-				decl.in = decl.out = true;
-				type = &types.data[decl.type];
+				param.s = expr.d.proc.out.data[i].name;
+				param.type = typeref(expr.d.proc.out.data[i].type);
+				param.in = param.out = true;
+				type = &types.data[param.type];
 				offset += type->size;
-				array_add((&expr.d.proc.block.decls), decl);
+				array_add((&expr.d.proc.block.decls), param);
 			}
 			parseblock(&expr.d.proc.block);
 		// a function call
 		} else if (tok->next && tok->next->type == TOK_LPAREN) {
-			size_t pidx;
 			expr.d.call.name = tok->slice;
-			struct decl *decl = finddecl(expr.d.call.name);
+			decl = finddecl(expr.d.call.name);
 			if (slice_cmplit(&expr.d.call.name, "syscall") == 0) {
 				expr.class = C_INT;
 			} else {
 				if (decl == NULL)
 					error(expr.start->line, expr.start->col, "undeclared procedure '%.*s'", expr.d.s.len, expr.d.s.data);
 
-				struct type *proctype = &types.data[decl->type];
-				if (proctype->d.params.out.len == 1) {
-					struct type *rettype = &types.data[*proctype->d.params.out.data];
+				type = &types.data[decl->type];
+				if (type->d.params.out.len == 1) {
+					struct type *rettype = &types.data[*type->d.params.out.data];
 					expr.class = typetoclass(rettype);
-				}
+				} else if (type->d.params.out.len > 1)
+					error(tok->line, tok->col, "only one return supported");
 			}
 
 			tok = tok->next->next;
 			expr.kind = EXPR_FCALL;
 
 			while (tok->type != TOK_RPAREN) {
-				pidx = parseexpr(block);
+				size_t pidx = parseexpr(block);
 				array_add((&expr.d.call.params), pidx);
 				if (tok->type == TOK_RPAREN)
 					break;
@@ -217,7 +200,7 @@ parseexpr(struct block *const block)
 			expr.kind = EXPR_IDENT;
 			expr.d.s = tok->slice;
 
-			struct decl *decl = finddecl(expr.d.s);
+			decl = finddecl(expr.d.s);
 			if (decl == NULL)
 				error(expr.start->line, expr.start->col, "undeclared identifier '%.*s'", expr.d.s.len, expr.d.s.data);
 			expr.class = typetoclass(&types.data[decl->type]);
@@ -289,7 +272,7 @@ binary_common:
 	return exprs.len - 1;
 }
 
-void
+static void
 parsetypelist(struct typelist *const list)
 {
 	expect(TOK_LPAREN);
@@ -391,7 +374,7 @@ static void
 parseblock(struct block *const block)
 {
 	struct statement statement;
-	bool curlies = false;
+	bool curlies = false, toplevel_decl = blockpeek() == NULL;
 
 	blockpush(block);
 	if (tok->type == TOK_LCURLY) {
@@ -404,7 +387,7 @@ parseblock(struct block *const block)
 		statement.start = tok;
 		if (tok->type == TOK_LET) {
 			struct decl decl = { 0 };
-			decl.toplevel = !(blocki - 1);
+			decl.toplevel = toplevel_decl;
 			decl.start = tok;
 			statement.kind = STMT_DECL;
 			tok = tok->next;
@@ -417,15 +400,14 @@ parseblock(struct block *const block)
 			expect(TOK_EQUAL);
 			tok = tok->next;
 
-			if (finddecl(decl.s)) {
+			if (finddecl(decl.s))
 				error(tok->line, tok->col, "repeat declaration!");
-			}
 
 			decl.val = parseexpr(block);
 			array_add((&block->decls), decl);
 
 			statement.idx = block->decls.len - 1;
-			array_add((block), statement);
+			array_add(block, statement);
 		} else if (tok->type == TOK_RETURN) {
 			statement.kind = STMT_RETURN;
 			tok = tok->next;
