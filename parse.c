@@ -15,6 +15,8 @@ static const struct token *tok;
 static void parsenametypes(struct nametypes *const nametypes);
 static size_t parsetype();
 
+#define EXPECTADV(t) { expect(t); tok = tok->next; }
+
 static void
 expect(const enum tokentype type)
 {
@@ -130,8 +132,7 @@ parseexpr(struct block *const block)
 	case TOK_LPAREN:
 		tok = tok->next;
 		size_t ret = parseexpr(block);
-		expect(TOK_RPAREN);
-		tok = tok->next;
+		EXPECTADV(TOK_RPAREN);
 		return ret;
 	case TOK_NAME:
 		expr.start = tok;
@@ -190,11 +191,9 @@ parseexpr(struct block *const block)
 				array_add((&expr.d.call.params), pidx);
 				if (tok->type == TOK_RPAREN)
 					break;
-				expect(TOK_COMMA);
-				tok = tok->next;
+				EXPECTADV(TOK_COMMA);
 			}
-			expect(TOK_RPAREN);
-			tok = tok->next;
+			EXPECTADV(TOK_RPAREN);
 		// an ident
 		} else {
 			expr.kind = EXPR_IDENT;
@@ -275,8 +274,7 @@ binary_common:
 static void
 parsetypelist(struct typelist *const list)
 {
-	expect(TOK_LPAREN);
-	tok = tok->next;
+	EXPECTADV(TOK_LPAREN);
 	size_t type;
 
 	while (tok->type != TOK_RPAREN) {
@@ -286,8 +284,7 @@ parsetypelist(struct typelist *const list)
 		if (tok->type == TOK_RPAREN)
 			break;
 
-		expect(TOK_COMMA);
-		tok = tok->next;
+		EXPECTADV(TOK_COMMA);
 	}
 
 	tok = tok->next;
@@ -326,8 +323,7 @@ parsetype()
 			error(tok->line, tok->col, "expected positive integer for array size");
 		type.d.arr.len = len.d.v.v.i64;
 
-		expect(TOK_RSQUARE);
-		tok = tok->next;
+		EXPECTADV(TOK_RSQUARE);
 
 		type.d.arr.subtype = parsetype();
 	} else {
@@ -346,8 +342,7 @@ parsetype()
 static void
 parsenametypes(struct nametypes *const nametypes)
 {
-	expect(TOK_LPAREN);
-	tok = tok->next;
+	EXPECTADV(TOK_LPAREN);
 	struct nametype nametype;
 	while (tok->type != TOK_RPAREN) {
 		nametype = (struct nametype){ 0 };
@@ -363,8 +358,7 @@ parsenametypes(struct nametypes *const nametypes)
 		if (tok->type == TOK_RPAREN)
 			break;
 
-		expect(TOK_COMMA);
-		tok = tok->next;
+		EXPECTADV(TOK_COMMA);
 	}
 
 	tok = tok->next;
@@ -377,10 +371,8 @@ parseblock(struct block *const block)
 	bool toplevel = blockpeek() == NULL;
 
 	blockpush(block);
-	if (!toplevel) {
-		expect(TOK_LCURLY);
-		tok = tok->next;
-	}
+	if (!toplevel)
+		EXPECTADV(TOK_LCURLY);
 
 	while (!(tok->type == TOK_NONE || (!toplevel && tok->type == TOK_RCURLY))) {
 		statement = (struct statement){ 0 };
@@ -397,8 +389,7 @@ parseblock(struct block *const block)
 			tok = tok->next;
 
 			decl.type = parsetype();
-			expect(TOK_EQUAL);
-			tok = tok->next;
+			EXPECTADV(TOK_EQUAL);
 
 			if (finddecl(decl.s))
 				error(tok->line, tok->col, "repeat declaration!");
@@ -431,10 +422,8 @@ parseblock(struct block *const block)
 		}
 	}
 
-	if (!toplevel) {
-		expect(TOK_RCURLY);
-		tok = tok->next;
-	}
+	if (!toplevel)
+		EXPECTADV(TOK_RCURLY);
 
 	blockpop();
 }
