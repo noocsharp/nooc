@@ -5,17 +5,19 @@
 #include <string.h>
 
 #include "nooc.h"
+#include "stack.h"
 #include "ir.h"
 #include "util.h"
 #include "type.h"
 #include "map.h"
 #include "blake3.h"
 #include "array.h"
-#include "blockstack.h"
 
 // hashtable based on cproc's map.c
 
 struct types types;
+
+static const struct stack *blocks;
 
 static struct typetable {
 	size_t cap, count;
@@ -214,7 +216,7 @@ static void
 typecheckcall(const struct expr *const expr)
 {
 	assert(expr->kind == EXPR_FCALL);
-	const struct decl *const decl = finddecl(expr->d.call.name);
+	const struct decl *const decl = finddecl(blocks, expr->d.call.name);
 
 	if (decl == NULL) {
 		if (slice_cmplit(&expr->d.call.name, "syscall") == 0)
@@ -261,8 +263,9 @@ typecheckexpr(const size_t expri)
 }
 
 void
-typecheck(const struct block *const block)
+typecheck(const struct stack *const blockstack, const struct block *const block)
 {
+	blocks = blockstack;
 	for (size_t i = 0; i < block->len; i++) {
 		const struct statement *const statement = &block->data[i];
 		const struct decl *decl;
@@ -270,7 +273,7 @@ typecheck(const struct block *const block)
 		switch (block->data[i].kind) {
 		case STMT_ASSGN:
 			assgn = &assgns.data[statement->idx];
-			decl = finddecl(assgn->s);
+			decl = finddecl(blocks, assgn->s);
 			if (decl == NULL)
 				error(assgn->start->line, assgn->start->col, "typecheck: unknown name '%.*s'", assgn->s.len, assgn->s.data);
 
@@ -294,4 +297,6 @@ typecheck(const struct block *const block)
 			error(statement->start->line, statement->start->col, "unknown statement type");
 		}
 	}
+
+	blocks = NULL;
 }

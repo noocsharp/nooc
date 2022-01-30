@@ -4,14 +4,16 @@
 #include <stdlib.h>
 
 #include "nooc.h"
+#include "stack.h"
 #include "ir.h"
 #include "util.h"
 #include "array.h"
 #include "type.h"
 #include "map.h"
-#include "blockstack.h"
 
 static const struct token *tok;
+static struct stack blocks;
+
 static void parsenametypes(struct nametypes *const nametypes);
 static size_t parsetype();
 
@@ -168,7 +170,7 @@ parseexpr(struct block *const block)
 		// a function call
 		} else if (tok->next && tok->next->type == TOK_LPAREN) {
 			expr.d.call.name = tok->slice;
-			decl = finddecl(expr.d.call.name);
+			decl = finddecl(&blocks, expr.d.call.name);
 			if (slice_cmplit(&expr.d.call.name, "syscall") == 0) {
 				expr.class = C_INT;
 			} else {
@@ -199,7 +201,7 @@ parseexpr(struct block *const block)
 			expr.kind = EXPR_IDENT;
 			expr.d.s = tok->slice;
 
-			decl = finddecl(expr.d.s);
+			decl = finddecl(&blocks, expr.d.s);
 			if (decl == NULL)
 				error(expr.start->line, expr.start->col, "undeclared identifier '%.*s'", expr.d.s.len, expr.d.s.data);
 			expr.class = typetoclass(&types.data[decl->type]);
@@ -368,9 +370,9 @@ static void
 parseblock(struct block *const block)
 {
 	struct statement statement;
-	bool toplevel = blockpeek() == NULL;
+	bool toplevel = stackpeek(&blocks) == NULL;
 
-	blockpush(block);
+	stackpush(&blocks, block);
 	if (!toplevel)
 		EXPECTADV(TOK_LCURLY);
 
@@ -391,7 +393,7 @@ parseblock(struct block *const block)
 			decl.type = parsetype();
 			EXPECTADV(TOK_EQUAL);
 
-			if (finddecl(decl.s))
+			if (finddecl(&blocks, decl.s))
 				error(tok->line, tok->col, "repeat declaration!");
 
 			decl.val = parseexpr(block);
@@ -425,7 +427,7 @@ parseblock(struct block *const block)
 	if (!toplevel)
 		EXPECTADV(TOK_RCURLY);
 
-	blockpop();
+	stackpop(&blocks);
 }
 
 struct block
@@ -434,5 +436,9 @@ parse(const struct token *const start)
 	tok = start;
 	struct block block = { 0 };
 	parseblock(&block);
+	if (blocks.data)
+		free(blocks.data);
+
+	blocks = (struct stack){ 0 };
 	return block;
 }

@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "nooc.h"
+#include "stack.h"
 #include "ir.h"
 #include "util.h"
 #include "array.h"

@@ -7,9 +7,9 @@
 
 #include "array.h"
 #include "nooc.h"
+#include "stack.h"
 #include "ir.h"
 #include "util.h"
-#include "blockstack.h"
 #include "target.h"
 
 #define STARTINS(op, val, valtype) putins((out), (op), (val), (valtype)) ; curi++ ;
@@ -20,6 +20,7 @@
 #define PTRSIZE 8
 
 static uint64_t tmpi, labeli, curi, reali, rblocki, out_index;
+static struct stack *blocks;
 
 static void
 genblock(struct iproc *const out, const struct block *const block);
@@ -177,7 +178,7 @@ genexpr(struct iproc *const out, const size_t expri, uint64_t *const val)
 		}
 		return VT_TEMP;
 	case EXPR_IDENT: {
-		struct decl *decl = finddecl(expr->d.s);
+		struct decl *decl = finddecl(blocks, expr->d.s);
 		if (decl == NULL)
 			die("genexpr: EXPR_IDENT: decl is null");
 		struct type *type = &types.data[decl->type];
@@ -235,7 +236,8 @@ genexpr(struct iproc *const out, const size_t expri, uint64_t *const val)
 		case UOP_REF: {
 			struct expr *operand = &exprs.data[expr->d.uop.expr];
 			assert(operand->kind == EXPR_IDENT);
-			struct decl *decl = finddecl(operand->d.s);
+			struct decl *decl = finddecl(blocks, operand->d.s);
+			assert(decl);
 			// a global
 			if (decl->toplevel) {
 				*val = immediate(out, PTRSIZE, decl->w.addr);
@@ -289,27 +291,27 @@ genexpr(struct iproc *const out, const size_t expri, uint64_t *const val)
 		size_t startlabel = bumplabel(out), endlabel = bumplabel(out);
 		if (expr->d.cond.belse.len) {
 			size_t elselabel = bumplabel(out);
-			blockpush(&expr->d.cond.bif);
+			stackpush(blocks, &expr->d.cond.bif);
 			NEWBLOCK(startlabel, elselabel);
 			LABEL(startlabel);
 			STARTINS(IR_CONDJUMP, elselabel, VT_LABEL);
 			putins(out, IR_EXTRA, condtmp, valtype);
 			genblock(out, &expr->d.cond.bif);
-			blockpop();
+			stackpop(blocks);
 			STARTINS(IR_JUMP, endlabel, VT_LABEL);
-			blockpush(&expr->d.cond.belse);
+			stackpush(blocks, &expr->d.cond.belse);
 			NEWBLOCK(elselabel, endlabel);
 			LABEL(elselabel);
 			genblock(out, &expr->d.cond.belse);
-			blockpop();
+			stackpop(blocks);
 			LABEL(endlabel);
 		} else {
-			blockpush(&expr->d.cond.bif);
+			stackpush(blocks, &expr->d.cond.bif);
 			STARTINS(IR_CONDJUMP, endlabel, VT_LABEL);
 			NEWBLOCK(startlabel, endlabel);
 			putins(out, IR_EXTRA, condtmp, valtype);
 			genblock(out, &expr->d.cond.bif);
-			blockpop();
+			stackpop(blocks);
 			LABEL(endlabel);
 		}
 		return VT_EMPTY;
@@ -382,7 +384,7 @@ genblock(struct iproc *const out, const struct block *const block)
 			break;
 		case STMT_ASSGN:
 			assgn = &assgns.data[statement->idx];
-			decl = finddecl(assgn->s);
+			decl = finddecl(blocks, assgn->s);
 			genassign(out, decl, assgn->val);
 			break;
 		case STMT_EXPR:
@@ -443,10 +445,11 @@ chooseregs(const struct iproc *const proc)
 }
 
 size_t
-genproc(struct decl *const decl, const struct proc *const proc)
+genproc(struct stack *blockstack, struct decl *const decl, const struct proc *const proc)
 {
 	tmpi = labeli = curi = 1;
 	rblocki = reali = 0;
+	blocks = blockstack;
 	struct type *type;
 	struct iproc iproc = {
 		.s = decl->s,
@@ -473,7 +476,7 @@ genproc(struct decl *const decl, const struct proc *const proc)
 
 	LABEL(startlabel);
 	for (size_t j = 0; j < proc->in.len; j++, i++) {
-		struct decl *decl = finddecl(proc->in.data[j].name);
+		struct decl *decl = finddecl(blocks, proc->in.data[j].name);
 		type = &types.data[proc->in.data[j].type];
 		size_t what = NEWTMP;
 		decl->index = what;
@@ -484,7 +487,7 @@ genproc(struct decl *const decl, const struct proc *const proc)
 	}
 
 	for (size_t j = 0; j < proc->out.len; j++, i++) {
-		struct decl *decl = finddecl(proc->out.data[j].name);
+		struct decl *decl = finddecl(blocks, proc->out.data[j].name);
 		type = &types.data[proc->out.data[j].type];
 		size_t what = NEWTMP;
 		decl->index = what;
@@ -494,9 +497,9 @@ genproc(struct decl *const decl, const struct proc *const proc)
 		putins(out, IR_IN, i, VT_IMM);
 	}
 
-	blockpush(&proc->block);
+	stackpush(blocks, &proc->block);
 	genblock(out, &proc->block);
-	blockpop();
+	stackpop(blocks);
 
 	LABEL(endlabel);
 	chooseregs(&iproc);

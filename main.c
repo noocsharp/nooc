@@ -10,14 +10,15 @@
 
 #include "array.h"
 #include "nooc.h"
+#include "stack.h"
 #include "ir.h"
 #include "util.h"
 #include "elf.h"
 #include "type.h"
 #include "map.h"
-#include "blockstack.h"
 #include "target.h"
 
+static struct stack blocks;
 struct assgns assgns;
 struct exprs exprs;
 struct target targ;
@@ -88,8 +89,8 @@ void
 gentoplevel(struct toplevel *toplevel, struct block *block)
 {
 	char syscallname[] = "syscall0";
-	blockpush(block);
-	typecheck(block);
+	stackpush(&blocks, block);
+	typecheck(&blocks, block);
 	struct iproc iproc = { 0 };
 	uint64_t curaddr = TEXT_OFFSET;
 
@@ -120,11 +121,11 @@ gentoplevel(struct toplevel *toplevel, struct block *block)
 					toplevel->entry = curaddr;
 				}
 				assert(expr->kind == EXPR_PROC);
-				blockpush(&expr->d.proc.block);
-				typecheck(&expr->d.proc.block);
+				stackpush(&blocks, &expr->d.proc.block);
+				typecheck(&blocks, &expr->d.proc.block);
 				decl->w.addr = curaddr;
-				curaddr += genproc(decl, &expr->d.proc);
-				blockpop();
+				curaddr += genproc(&blocks, decl, &expr->d.proc);
+				stackpop(&blocks);
 			} else {
 				evalexpr(decl);
 			}
@@ -135,7 +136,7 @@ gentoplevel(struct toplevel *toplevel, struct block *block)
 		}
 
 	}
-	blockpop();
+	stackpop(&blocks);
 }
 
 struct stat statbuf;

@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "nooc.h"
+#include "stack.h"
 #include "ir.h"
 #include "array.h"
 #include "util.h"
@@ -226,6 +227,22 @@ dumpir(const struct iproc *const instrs)
 	for (size_t i = 0; i < instrs->labels.len; i++) {
 		fprintf(stderr, "%lu: %lu\n", i, instrs->labels.data[i]);
 	}
+}
+
+struct decl *
+finddecl(const struct stack *const blocks, const struct slice s)
+{
+	for (int j = blocks->idx - 1; j >= 0; j--) {
+		const struct block *block = blocks->data[j];
+		for (int i = 0; i < block->decls.len; i++) {
+			struct decl *decl = &block->decls.data[i];
+			if (slice_cmp(&s, &decl->s) == 0) {
+				return decl;
+			}
+		}
+	}
+
+	return NULL;
 }
 
 int
