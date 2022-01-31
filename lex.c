@@ -52,6 +52,9 @@ lex(struct slice start)
 		} else if (slice_cmplit(&start, "return") == 0) {
 			cur->type = TOK_RETURN;
 			ADVANCE(6);
+		} else if (slice_cmplit(&start, "break") == 0) {
+			cur->type = TOK_BREAK;
+			ADVANCE(5);
 		} else if (*start.data == '>') {
 			cur->type = TOK_GREATER;
 			ADVANCE(1);

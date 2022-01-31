@@ -1,0 +1,13 @@
+let str [9]i8 = "arstarst\n"
+
+let main proc() = proc() {
+	let i i64 = 0
+
+	loop {
+		if = i 10 { break }
+		syscall4(1, 0, $str, 9)
+		i = + i 1
+	}
+
+	syscall2(60, 0)
+}

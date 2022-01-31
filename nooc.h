@@ -31,7 +31,8 @@ enum tokentype {
 	TOK_IF,
 	TOK_ELSE,
 	TOK_LOOP,
-	TOK_RETURN
+	TOK_RETURN,
+	TOK_BREAK
 };
 
 struct slice {
@@ -151,6 +152,7 @@ struct statement {
 		STMT_ASSGN,
 		STMT_EXPR,
 		STMT_RETURN,
+		STMT_BREAK,
 	} kind;
 	size_t idx;
 	const struct token *start;

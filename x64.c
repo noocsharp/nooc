@@ -708,13 +708,16 @@ static size_t
 jmp(struct data *const text, const int64_t offset)
 {
 	uint8_t temp;
-	if (-256 <= offset && offset <= 255) {
-		int8_t i = offset;
+	if (-2147483648 <= offset && offset <= 2147483647) {
+		int32_t i = offset;
 		if (text) {
-			array_addlit(text, 0xEB);
-			array_addlit(text, i);
+			array_addlit(text, 0xE9);
+			array_addlit(text, ((uint32_t) i) & 0xFF);
+			array_addlit(text, (((uint32_t) i) >> 8) & 0xFF);
+			array_addlit(text, (((uint32_t) i) >> 16) & 0xFF);
+			array_addlit(text, (((uint32_t) i) >> 24) & 0xFF);
 		}
-		return 2;
+		return 5;
 	} else {
 		die("unimplemented jmp offet!");
 	}
@@ -850,7 +853,7 @@ emitblock(struct data *const text, const struct iproc *const proc, const struct 
 			if (ins < &proc->data[proc->labels.data[label]]) {
 				total += jmp(text, emitblock(NULL, proc, ins + 1, &proc->data[proc->labels.data[label]], active, curi));
 			} else {
-				total += jmp(text, emitblock(NULL, proc, start, &proc->data[proc->labels.data[label]], 0, 0) - total - 2); // FIXME: 2 = size of short jump
+				total += jmp(text, emitblock(NULL, proc, start, &proc->data[proc->labels.data[label]], 0, 0) - total - 5);
 			}
 			NEXT;
 			break;

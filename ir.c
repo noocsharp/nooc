@@ -20,7 +20,7 @@
 #define PTRSIZE 8
 
 static uint64_t tmpi, labeli, curi, reali, rblocki, out_index;
-static struct stack *blocks;
+static struct stack *blocks, loops;
 
 static void
 genblock(struct iproc *const out, const struct block *const block);
@@ -319,10 +319,12 @@ genexpr(struct iproc *const out, const size_t expri, uint64_t *const val)
 	case EXPR_LOOP: {
 		size_t startlabel = bumplabel(out), endlabel = bumplabel(out);
 		NEWBLOCK(startlabel, endlabel);
+		stackpush(&loops, &out->blocks.data[out->blocks.len - 1]);
 		LABEL(startlabel);
 		genblock(out, &expr->d.loop.block);
 		STARTINS(IR_JUMP, startlabel, VT_LABEL);
 		LABEL(endlabel);
+		stackpop(&loops);
 		return VT_EMPTY;
 	}
 	default:
@@ -393,6 +395,9 @@ genblock(struct iproc *const out, const struct block *const block)
 		case STMT_RETURN:
 			STARTINS(IR_RETURN, 0, VT_EMPTY);
 			break;
+		case STMT_BREAK:
+			STARTINS(IR_JUMP, ((struct iblock *)loops.data[loops.idx - 1])->end, VT_LABEL);
+			break;
 		default:
 			die("ir_genproc: unreachable");
 		}
@@ -450,6 +455,7 @@ genproc(struct stack *blockstack, struct decl *const decl, const struct proc *co
 	tmpi = labeli = curi = 1;
 	rblocki = reali = 0;
 	blocks = blockstack;
+	loops = (struct stack){ 0 };
 	struct type *type;
 	struct iproc iproc = {
 		.s = decl->s,
@@ -500,6 +506,9 @@ genproc(struct stack *blockstack, struct decl *const decl, const struct proc *co
 	stackpush(blocks, &proc->block);
 	genblock(out, &proc->block);
 	stackpop(blocks);
+
+	if (loops.data)
+		free(loops.data);
 
 	LABEL(endlabel);
 	chooseregs(&iproc);

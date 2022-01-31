@@ -13,6 +13,7 @@
 
 static const struct token *tok;
 static struct stack blocks;
+static int loopcount;
 
 static void parsenametypes(struct nametypes *const nametypes);
 static size_t parsetype();
@@ -116,7 +117,9 @@ parseexpr(struct block *const block)
 		expr.start = tok;
 		expr.kind = EXPR_LOOP;
 		tok = tok->next;
+		loopcount += 1;
 		parseblock(&expr.d.loop.block);
+		loopcount -= 1;
 		break;
 	case TOK_IF:
 		expr.start = tok;
@@ -403,6 +406,12 @@ parseblock(struct block *const block)
 			array_add(block, statement);
 		} else if (tok->type == TOK_RETURN) {
 			statement.kind = STMT_RETURN;
+			tok = tok->next;
+			array_add((block), statement);
+		} else if (tok->type == TOK_BREAK) {
+			if (!loopcount)
+				error(tok->line, tok->col, "break statement outside of loop");
+			statement.kind = STMT_BREAK;
 			tok = tok->next;
 			array_add((block), statement);
 		} else if (tok->type == TOK_NAME && tok->next && tok->next->type == TOK_EQUAL) {
