@@ -127,6 +127,9 @@ gentoplevel(struct toplevel *toplevel, struct block *block)
 				curaddr += genproc(&blocks, decl, &expr->d.proc);
 				stackpop(&blocks);
 			} else {
+				if (slice_cmplit(&decl->s, "main") == 0) {
+					die("global main must be procedure");
+				}
 				evalexpr(decl);
 			}
 			break;
