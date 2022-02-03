@@ -28,11 +28,9 @@ genblock(struct iproc *const out, const struct block *const block);
 static uint64_t
 procindex(const struct slice *const s)
 {
-	for (size_t i = 0; i < toplevel.code.len; i++) {
-		const struct iproc *const iproc = &toplevel.code.data[i];
-		if (slice_cmp(s, &iproc->s) == 0)
+	for (size_t i = 0; i < toplevel.code.len; i++)
+		if (slice_cmp(s, &toplevel.code.data[i].s) == 0)
 			return i;
-	}
 
 	die("unknown function, should be unreachable");
 	return 0;
