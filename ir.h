@@ -96,4 +96,4 @@ struct toplevel {
 	uint64_t entry;
 };
 
-size_t genproc(struct stack *blockstack, struct decl *const decl, const struct proc *const proc);
+void genproc(struct stack *blockstack, struct iproc *const out, const struct proc *const proc);

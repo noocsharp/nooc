@@ -117,14 +117,21 @@ gentoplevel(struct toplevel *toplevel, struct block *block)
 			decl_alloc(block, decl);
 
 			if (expr->class == C_PROC) {
+				iproc = (struct iproc){
+					.s = decl->s,
+					.addr = curaddr
+				};
+
 				if (slice_cmplit(&decl->s, "main") == 0) {
 					toplevel->entry = curaddr;
 				}
+
 				assert(expr->kind == EXPR_PROC);
 				stackpush(&blocks, &expr->d.proc.block);
 				typecheck(&blocks, &expr->d.proc.block);
-				decl->w.addr = curaddr;
-				curaddr += genproc(&blocks, decl, &expr->d.proc);
+				genproc(&blocks, &iproc, &expr->d.proc);
+				array_add((&toplevel->code), iproc);
+				curaddr += targ.emitproc(&toplevel->text, &iproc);
 				stackpop(&blocks);
 			} else {
 				if (slice_cmplit(&decl->s, "main") == 0) {

@@ -446,30 +446,23 @@ chooseregs(const struct iproc *const proc)
 			}
 		}
 	}
-
 }
 
-size_t
-genproc(struct stack *blockstack, struct decl *const decl, const struct proc *const proc)
+void
+genproc(struct stack *blockstack, struct iproc *const out, const struct proc *const proc)
 {
 	tmpi = labeli = curi = 1;
 	rblocki = reali = 0;
 	blocks = blockstack;
 	loops = (struct stack){ 0 };
 	struct type *type;
-	struct iproc iproc = {
-		.s = decl->s,
-		.addr = decl->w.addr,
-	};
-
-	struct iproc *out = &iproc; // for macros to work, a bit hacky
 
 	// put a blank interval, since tmpi starts at 1
 	{
 		struct temp temp = { 0 };
-		array_add((&iproc.temps), temp);
+		array_add((&out->temps), temp);
 	}
-	array_add((&iproc.labels), labeli);
+	array_add((&out->labels), labeli);
 
 	size_t startlabel = bumplabel(out), endlabel = bumplabel(out);
 	{
@@ -487,8 +480,8 @@ genproc(struct stack *blockstack, struct decl *const decl, const struct proc *co
 		size_t what = NEWTMP;
 		decl->index = what;
 		STARTINS(IR_ASSIGN, what, VT_TEMP);
-		iproc.temps.data[what].flags = TF_INT; // FIXME: move this to a separate function?
-		iproc.temps.data[what].size = type->size; // FIXME: should we check that it's a power of 2?
+		out->temps.data[what].flags = TF_INT; // FIXME: move this to a separate function?
+		out->temps.data[what].size = type->size; // FIXME: should we check that it's a power of 2?
 		putins(out, IR_IN, i, VT_IMM);
 	}
 
@@ -498,8 +491,8 @@ genproc(struct stack *blockstack, struct decl *const decl, const struct proc *co
 		size_t what = NEWTMP;
 		decl->index = what;
 		STARTINS(IR_ASSIGN, what, VT_TEMP);
-		iproc.temps.data[what].flags = TF_PTR; // FIXME: move this to a separate function?
-		iproc.temps.data[what].size = type->size; // FIXME: should we check that it's a power of 2?
+		out->temps.data[what].flags = TF_PTR; // FIXME: move this to a separate function?
+		out->temps.data[what].size = type->size; // FIXME: should we check that it's a power of 2?
 		putins(out, IR_IN, i, VT_IMM);
 	}
 
@@ -511,8 +504,5 @@ genproc(struct stack *blockstack, struct decl *const decl, const struct proc *co
 		free(loops.data);
 
 	LABEL(endlabel);
-	chooseregs(&iproc);
-	array_add((&toplevel.code), iproc);
-
-	return targ.emitproc(&toplevel.text, out);
+	chooseregs(out);
 }
