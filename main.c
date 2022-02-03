@@ -50,18 +50,6 @@ data_set(const uint64_t addr, const void *const ptr, const size_t len)
 }
 
 void
-decl_alloc(struct block *block, struct decl *decl)
-{
-	const struct type *const type = &types.data[decl->type];
-	if (type->class == TYPE_ARRAY) {
-		const struct type *const subtype = &types.data[type->d.arr.subtype];
-		decl->w.addr = data_pushzero(subtype->size * type->d.arr.len);
-	} else {
-		decl->w.addr = data_pushzero(type->size);
-	}
-}
-
-void
 evalexpr(struct decl *const decl)
 {
 	struct expr *expr = &exprs.data[decl->val];
@@ -86,7 +74,7 @@ evalexpr(struct decl *const decl)
 }
 
 void
-gentoplevel(struct toplevel *toplevel, struct block *block)
+gentoplevel(struct toplevel *toplevel, const struct block *const block)
 {
 	char syscallname[] = "syscall0";
 	stackpush(&blocks, block);
@@ -112,21 +100,20 @@ gentoplevel(struct toplevel *toplevel, struct block *block)
 			die("toplevel assignments are unimplemented");
 		case STMT_DECL: {
 			struct decl *const decl = &block->decls.data[statement->idx];
-			struct expr *const expr = &exprs.data[decl->val];
+			const struct expr *const expr = &exprs.data[decl->val];
+			const struct type *const type = &types.data[decl->type];
 
-			decl_alloc(block, decl);
-
-			if (expr->class == C_PROC) {
+			if (type->class == TYPE_PROC) {
+				assert(expr->class == C_PROC);
+				assert(expr->kind == EXPR_PROC);
 				iproc = (struct iproc){
 					.s = decl->s,
 					.addr = curaddr
 				};
 
-				if (slice_cmplit(&decl->s, "main") == 0) {
+				if (slice_cmplit(&decl->s, "main") == 0)
 					toplevel->entry = curaddr;
-				}
 
-				assert(expr->kind == EXPR_PROC);
 				stackpush(&blocks, &expr->d.proc.block);
 				typecheck(&blocks, &expr->d.proc.block);
 				genproc(&blocks, &iproc, &expr->d.proc);
@@ -134,9 +121,16 @@ gentoplevel(struct toplevel *toplevel, struct block *block)
 				curaddr += targ.emitproc(&toplevel->text, &iproc);
 				stackpop(&blocks);
 			} else {
-				if (slice_cmplit(&decl->s, "main") == 0) {
+				if (slice_cmplit(&decl->s, "main") == 0)
 					die("global main must be procedure");
+
+				if (type->class == TYPE_ARRAY) {
+					const struct type *const subtype = &types.data[type->d.arr.subtype];
+					decl->w.addr = data_pushzero(subtype->size * type->d.arr.len);
+				} else {
+					decl->w.addr = data_pushzero(type->size);
 				}
+
 				evalexpr(decl);
 			}
 			break;
@@ -184,7 +178,7 @@ main(int argc, char *argv[])
 
 	typesmap = mkmap(16);
 	inittypes();
-	struct block statements = parse(head);
+	const struct block statements = parse(head);
 
 	gentoplevel(&toplevel, &statements);
 
