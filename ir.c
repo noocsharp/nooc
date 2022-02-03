@@ -163,7 +163,7 @@ static int
 genexpr(struct iproc *const out, const size_t expri, uint64_t *const val)
 {
 	struct expr *expr = &exprs.data[expri];
-	uint64_t temp2 = 0;
+
 	switch (expr->kind) {
 	case EXPR_LIT:
 		switch (expr->class) {
@@ -181,14 +181,14 @@ genexpr(struct iproc *const out, const size_t expri, uint64_t *const val)
 			die("genexpr: EXPR_IDENT: decl is null");
 		struct type *type = &types.data[decl->type];
 		if (decl->toplevel) {
-			temp2 = immediate(out, PTRSIZE, decl->w.addr);
+			uint64_t addr = immediate(out, PTRSIZE, decl->w.addr);
 
 			switch (type->size) {
 			case 1:
 			case 2:
 			case 4:
 			case 8:
-				*val = load(out, type->size, temp2);
+				*val = load(out, type->size, addr);
 				break;
 			default:
 				die("genexpr: unknown size");
