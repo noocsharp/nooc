@@ -143,8 +143,6 @@ gentoplevel(struct toplevel *toplevel, const struct block *const block)
 	stackpop(&blocks);
 }
 
-struct stat statbuf;
-
 int
 main(int argc, char *argv[])
 {
@@ -161,6 +159,7 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
+	struct stat statbuf;
 	if (fstat(in, &statbuf) < 0) {
 		close(in);
 		fprintf(stderr, "failed to stat in file\n");
