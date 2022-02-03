@@ -33,7 +33,6 @@ expect(const enum tokentype type)
 static void
 parsestring(struct expr *const expr)
 {
-	expr->start = tok;
 	expr->kind = EXPR_LIT;
 	expr->class = C_STR;
 	expr->d.v.v.s = (struct slice){ 0 };
@@ -69,7 +68,6 @@ parsestring(struct expr *const expr)
 static void
 parsenum(struct expr *const expr)
 {
-	expr->start = tok;
 	expr->kind = EXPR_LIT;
 	expr->class = C_INT;
 
@@ -112,9 +110,17 @@ parseexpr(struct block *const block)
 	struct expr expr = { 0 };
 	const struct type *type;
 	const struct decl *decl;
+
+	if (tok->type == TOK_LPAREN) {
+		tok = tok->next;
+		size_t ret = parseexpr(block);
+		EXPECTADV(TOK_RPAREN);
+		return ret;
+	}
+
+	expr.start = tok;
 	switch (tok->type) {
 	case TOK_LOOP:
-		expr.start = tok;
 		expr.kind = EXPR_LOOP;
 		tok = tok->next;
 		loopcount += 1;
@@ -122,7 +128,6 @@ parseexpr(struct block *const block)
 		loopcount -= 1;
 		break;
 	case TOK_IF:
-		expr.start = tok;
 		expr.kind = EXPR_COND;
 		tok = tok->next;
 		expr.d.cond.cond = parseexpr(block);
@@ -134,13 +139,53 @@ parseexpr(struct block *const block)
 			parseblock(&expr.d.cond.belse);
 		}
 		break;
-	case TOK_LPAREN:
+	case TOK_NOT:
 		tok = tok->next;
-		size_t ret = parseexpr(block);
-		EXPECTADV(TOK_RPAREN);
-		return ret;
+		expr.kind = EXPR_UNARY;
+		expr.d.uop.kind = UOP_NOT;
+		expr.d.uop.expr = parseexpr(block);
+		if (exprs.data[expr.d.uop.expr].class != C_BOOL)
+			error(tok->line, tok->col, "expected boolean expression as not operand");
+		expr.class = C_BOOL;
+		break;
+	case TOK_EQUAL:
+		expr.kind = EXPR_BINARY;
+		expr.d.bop.kind = BOP_EQUAL;
+		goto bool_common;
+	case TOK_GREATER:
+		expr.kind = EXPR_BINARY;
+		expr.d.bop.kind = BOP_GREATER;
+bool_common:
+		tok = tok->next;
+		expr.d.bop.left = parseexpr(block);
+		expr.d.bop.right = parseexpr(block);
+		if (exprs.data[expr.d.bop.left].class != exprs.data[expr.d.bop.right].class)
+			error(tok->line, tok->col, "expected boolean expression operands to be of same class");
+		expr.class = C_BOOL;
+		break;
+	case TOK_PLUS:
+		expr.kind = EXPR_BINARY;
+		expr.d.bop.kind = BOP_PLUS;
+		goto binary_common;
+	case TOK_MINUS:
+		expr.kind = EXPR_BINARY;
+		expr.d.bop.kind = BOP_MINUS;
+binary_common:
+		tok = tok->next;
+		expr.d.bop.left = parseexpr(block);
+		expr.d.bop.right = parseexpr(block);
+		if (exprs.data[expr.d.bop.left].class != exprs.data[expr.d.bop.right].class)
+			error(tok->line, tok->col, "expected binary expression operands to be of same class");
+		expr.class = exprs.data[expr.d.bop.left].class;
+		break;
+	case TOK_DOLLAR:
+		expr.kind = EXPR_UNARY;
+		expr.class = C_REF;
+		expr.d.uop.kind = UOP_REF;
+		tok = tok->next;
+		expr.d.uop.expr = parseexpr(block);
+		break;
 	case TOK_NAME:
-		expr.start = tok;
 		// a procedure definition
 		if (slice_cmplit(&tok->slice, "proc") == 0) {
 			struct decl param = { 0 };
@@ -214,58 +259,8 @@ parseexpr(struct block *const block)
 	case TOK_NUM:
 		parsenum(&expr);
 		break;
-	case TOK_NOT:
-		expr.start = tok;
-		tok = tok->next;
-		expr.kind = EXPR_UNARY;
-		expr.d.uop.kind = UOP_NOT;
-		expr.d.uop.expr = parseexpr(block);
-		if (exprs.data[expr.d.uop.expr].class != C_BOOL)
-			error(tok->line, tok->col, "expected boolean expression as not operand");
-		expr.class = C_BOOL;
-		break;
-	case TOK_EQUAL:
-		expr.kind = EXPR_BINARY;
-		expr.d.bop.kind = BOP_EQUAL;
-		goto bool_common;
-	case TOK_GREATER:
-		expr.kind = EXPR_BINARY;
-		expr.d.bop.kind = BOP_GREATER;
-bool_common:
-		expr.start = tok;
-		tok = tok->next;
-		expr.d.bop.left = parseexpr(block);
-		expr.d.bop.right = parseexpr(block);
-		if (exprs.data[expr.d.bop.left].class != exprs.data[expr.d.bop.right].class)
-			error(tok->line, tok->col, "expected boolean expression operands to be of same class");
-		expr.class = C_BOOL;
-		break;
-	case TOK_PLUS:
-		expr.kind = EXPR_BINARY;
-		expr.d.bop.kind = BOP_PLUS;
-		goto binary_common;
-	case TOK_MINUS:
-		expr.kind = EXPR_BINARY;
-		expr.d.bop.kind = BOP_MINUS;
-binary_common:
-		expr.start = tok;
-		tok = tok->next;
-		expr.d.bop.left = parseexpr(block);
-		expr.d.bop.right = parseexpr(block);
-		if (exprs.data[expr.d.bop.left].class != exprs.data[expr.d.bop.right].class)
-			error(tok->line, tok->col, "expected binary expression operands to be of same class");
-		expr.class = exprs.data[expr.d.bop.left].class;
-		break;
 	case TOK_STRING:
 		parsestring(&expr);
-		break;
-	case TOK_DOLLAR:
-		expr.start = tok;
-		expr.kind = EXPR_UNARY;
-		expr.class = C_REF;
-		expr.d.uop.kind = UOP_REF;
-		tok = tok->next;
-		expr.d.uop.expr = parseexpr(block);
 		break;
 	default:
 		error(tok->line, tok->col, "invalid token for expression");
