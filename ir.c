@@ -248,7 +248,7 @@ genexpr(struct iproc *const out, const size_t expri, uint64_t *const val)
 			uint64_t arg;
 			int type = genexpr(out, expr->d.uop.expr, &arg);
 			assert(type == VT_TEMP);
-			*val = assign(out, 4); // FIXME: how big should bools be?
+			*val = assign(out, 1); // FIXME: how big should bools be?
 			putins(out, IR_NOT, arg, VT_TEMP);
 			break;
 		}

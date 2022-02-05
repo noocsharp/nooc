@@ -912,8 +912,8 @@ emitblock(struct data *const text, const struct iproc *const proc, const struct 
 			switch (ins->op) {
 			case IR_NOT:
 				assert(ins->valtype == VT_TEMP);
-				assert(size == 4);
-				total += cmp_r32_r32(text, src, proc->temps.data[ins->val].reg);
+				assert(size == 1);
+				total += cmp_r8_imm(text, proc->temps.data[ins->val].reg, 1);
 				total += setne_reg(text, dest);
 				NEXT;
 				break;
