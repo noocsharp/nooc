@@ -185,6 +185,21 @@ binary_common:
 		tok = tok->next;
 		expr.d.uop.expr = parseexpr(block);
 		break;
+	case TOK_LSQUARE:
+		expr.kind = EXPR_ACCESS;
+		tok = tok->next;
+		expect(TOK_NUM);
+		struct expr index = { 0 };
+		parsenum(&index);
+		if (index.d.v.v.i64 < 0)
+			error(tok->line, tok->col, "expected non-negative integer for array index");
+		expr.d.access.index = index.d.v.v.i64;
+
+		expect(TOK_RSQUARE);
+		tok = tok->next;
+		expr.d.access.array = parseexpr(block);
+		expr.class = C_INT; //FIXME: determine from parent type
+		break;
 	case TOK_NAME:
 		// a procedure definition
 		if (slice_cmplit(&tok->slice, "proc") == 0) {

@@ -1,0 +1,31 @@
+let hello [5]i8 = "hello"
+
+let main proc() = proc() {
+	let char i8 = [0]hello
+
+	if != char 104 {
+		syscall2(60, 1)
+	}
+
+	char = [1]hello
+	if != char 101 {
+		syscall2(60, 2)
+	}
+
+	char = [2]hello
+	if != char 108 {
+		syscall2(60, 3)
+	}
+
+	char = [3]hello
+	if != char 108 {
+		syscall2(60, 4)
+	}
+
+	char = [4]hello
+	if != char 111 {
+		syscall2(60, 5)
+	}
+
+	syscall2(60, 0)
+}

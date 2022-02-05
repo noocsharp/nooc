@@ -186,6 +186,11 @@ struct proc {
 	struct block block;
 };
 
+struct access {
+	uint64_t index;
+	size_t array; // struct exprs
+};
+
 struct binop {
 	enum {
 		BOP_PLUS,
@@ -222,6 +227,7 @@ enum exprkind {
 	EXPR_COND,
 	EXPR_LOOP,
 	EXPR_PROC,
+	EXPR_ACCESS,
 };
 
 enum class {
@@ -244,6 +250,7 @@ struct expr {
 		struct cond cond;
 		struct loop loop;
 		struct proc proc;
+		struct access access;
 	} d;
 	const struct token *start;
 };

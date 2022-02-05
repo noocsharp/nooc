@@ -325,6 +325,23 @@ genexpr(struct iproc *const out, const size_t expri, uint64_t *const val)
 		stackpop(&loops);
 		return VT_EMPTY;
 	}
+	case EXPR_ACCESS: {
+		struct expr *expr2 = &exprs.data[expr->d.access.array];
+		assert(expr2->kind == EXPR_IDENT);
+		struct decl *decl = finddecl(blocks, expr2->d.s);
+		struct type *type = &types.data[decl->type];
+		assert(type->class == TYPE_ARRAY);
+		struct type *subtype = &types.data[type->d.arr.subtype];
+		assert(subtype->size <= 8);
+		if (decl->toplevel) {
+			uint64_t addr = immediate(out, 8, decl->w.addr + expr->d.access.index * subtype->size);
+			*val = load(out, subtype->size, addr);
+		} else {
+			die("genexpr: EXPR_ACCESS: non-toplevel array access unhandled");
+		}
+		return VT_TEMP;
+		break;
+	}
 	default:
 		die("genexpr: expr kind");
 	}

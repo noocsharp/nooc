@@ -253,6 +253,7 @@ typecheckexpr(const size_t expri)
 	case EXPR_PROC:
 	case EXPR_LOOP:
 	case EXPR_IDENT:
+	case EXPR_ACCESS:
 		break;
 	case EXPR_FCALL:
 		typecheckcall(expr);
