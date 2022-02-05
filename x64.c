@@ -885,7 +885,22 @@ emitblock(struct data *const text, const struct iproc *const proc, const struct 
 			NEXT;
 			assert(ins->op == IR_EXTRA);
 			assert(ins->valtype == VT_TEMP);
-			total += mov_mr64_r64(text, proc->temps.data[ins->val].reg, src);
+			switch (proc->temps.data[ins->val].size) {
+			case 8:
+				total += mov_mr64_r64(text, proc->temps.data[ins->val].reg, src);
+				break;
+			case 4:
+				total += mov_mr32_r32(text, proc->temps.data[ins->val].reg, src);
+				break;
+			case 2:
+				total += mov_mr16_r16(text, proc->temps.data[ins->val].reg, src);
+				break;
+			case 1:
+				total += mov_mr8_r8(text, proc->temps.data[ins->val].reg, src);
+				break;
+			default:
+				die("x64: emitblock: IR_STORE: bad size");
+			}
 			NEXT;
 			break;
 		case IR_ASSIGN:
