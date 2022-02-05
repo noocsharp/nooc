@@ -547,7 +547,7 @@ _cmp_reg_to_reg(struct data *const text, const uint8_t size, const enum reg reg1
 		if (rex)
 			array_addlit(text, rex);
 
-		array_addlit(text, 0x3b);
+		array_addlit(text, 0x3A + (size != 1));
 		array_addlit(text, (MOD_DIRECT << 6) | (reg1 << 3) | reg2);
 	}
 
