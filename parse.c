@@ -104,6 +104,9 @@ typetoclass(const struct type *const type)
 
 static void parseblock(struct block *const block);
 
+#define BINARYOP(x) expr.kind = EXPR_BINARY; expr.d.bop.kind = (x);
+#define UNARYOP(x) expr.kind = EXPR_UNARY; expr.d.uop.kind = (x);
+
 static size_t
 parseexpr(struct block *const block)
 {
@@ -141,20 +144,17 @@ parseexpr(struct block *const block)
 		break;
 	case TOK_NOT:
 		tok = tok->next;
-		expr.kind = EXPR_UNARY;
-		expr.d.uop.kind = UOP_NOT;
+		UNARYOP(UOP_NOT);
 		expr.d.uop.expr = parseexpr(block);
 		if (exprs.data[expr.d.uop.expr].class != C_BOOL)
 			error(tok->line, tok->col, "expected boolean expression as not operand");
 		expr.class = C_BOOL;
 		break;
 	case TOK_EQUAL:
-		expr.kind = EXPR_BINARY;
-		expr.d.bop.kind = BOP_EQUAL;
+		BINARYOP(BOP_EQUAL);
 		goto bool_common;
 	case TOK_GREATER:
-		expr.kind = EXPR_BINARY;
-		expr.d.bop.kind = BOP_GREATER;
+		BINARYOP(BOP_GREATER);
 bool_common:
 		tok = tok->next;
 		expr.d.bop.left = parseexpr(block);
@@ -164,12 +164,10 @@ bool_common:
 		expr.class = C_BOOL;
 		break;
 	case TOK_PLUS:
-		expr.kind = EXPR_BINARY;
-		expr.d.bop.kind = BOP_PLUS;
+		BINARYOP(BOP_PLUS);
 		goto binary_common;
 	case TOK_MINUS:
-		expr.kind = EXPR_BINARY;
-		expr.d.bop.kind = BOP_MINUS;
+		BINARYOP(BOP_MINUS);
 binary_common:
 		tok = tok->next;
 		expr.d.bop.left = parseexpr(block);
@@ -179,9 +177,8 @@ binary_common:
 		expr.class = exprs.data[expr.d.bop.left].class;
 		break;
 	case TOK_DOLLAR:
-		expr.kind = EXPR_UNARY;
+		UNARYOP(UOP_REF);
 		expr.class = C_REF;
-		expr.d.uop.kind = UOP_REF;
 		tok = tok->next;
 		expr.d.uop.expr = parseexpr(block);
 		break;
