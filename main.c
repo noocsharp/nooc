@@ -17,6 +17,7 @@
 #include "type.h"
 #include "map.h"
 #include "target.h"
+#include "run.h"
 
 static struct stack blocks;
 struct assgns assgns;
@@ -188,9 +189,8 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
+	run(&toplevel);
 	munmap(addr, statbuf.st_size);
-
-	elf(toplevel.entry, &toplevel.text, &toplevel.data, out);
 
 	fclose(out);
 }
