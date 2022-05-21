@@ -1,8 +1,11 @@
+SRC = main.c run.c array.c util.c x64.c elf.c lex.c parse.c map.c siphash.c type.c blake3.c stack.c ir.c
+OBJ=$(SRC:%.c=%.o)
+
 .c.o:
 	$(CC) -Wall -c $< -o $@
 
-nooc: main.o run.o array.o util.o x64.o elf.o lex.o parse.o map.o siphash.o type.o blake3.o stack.o ir.o
-	$(CC) main.o run.o array.o x64.o util.o elf.o lex.o parse.o map.o siphash.o type.o blake3.o stack.o ir.o -o nooc
+nooc: $(OBJ)
+	$(CC) $(OBJ) -o nooc
 
 clean:
 	rm -f *.o nooc
