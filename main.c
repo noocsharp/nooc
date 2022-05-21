@@ -148,8 +148,8 @@ int
 main(int argc, char *argv[])
 {
 	targ = x64_target;
-	if (argc < 3) {
-		fprintf(stderr, "not enough args\n");
+	if (argc != 2) {
+		fprintf(stderr, "exactly 1 argument allowed\n");
 		return 1;
 	}
 
@@ -182,15 +182,6 @@ main(int argc, char *argv[])
 
 	gentoplevel(&toplevel, &statements);
 
-	FILE *const out = fopen(argv[2], "w");
-	if (!out) {
-		close(in);
-		fprintf(stderr, "couldn't open output\n");
-		return 1;
-	}
-
 	run(&toplevel);
 	munmap(addr, statbuf.st_size);
-
-	fclose(out);
 }
